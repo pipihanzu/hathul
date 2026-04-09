@@ -9,6 +9,16 @@ import { motion } from 'motion/react';
 import { ChevronDown, Sword } from 'lucide-react';
 import Game from './components/Game';
 
+type LeaderboardEntry = {
+  id: string;
+  name: string;
+  score: number;
+  level: number;
+  createdAt: string;
+};
+
+const SCOREBOARD_CACHE_KEY = 'hathul-scoreboard-cache';
+
 export default function App() {
   const [gameState, setGameState] = useState<'start' | 'playing'>('start');
   const [musicVolume, setMusicVolume] = useState(() => {
@@ -16,6 +26,52 @@ export default function App() {
     const stored = window.localStorage.getItem('hathul-music-volume');
     return stored === null ? 0.5 : parseFloat(stored);
   });
+  const [showScoreboard, setShowScoreboard] = useState(false);
+  const [leaderboardEntries, setLeaderboardEntries] = useState<LeaderboardEntry[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
+
+  const loadScoreboard = async () => {
+    setLeaderboardLoading(true);
+    setLeaderboardError(null);
+    try {
+      const res = await fetch('/api/scoreboard');
+      if (!res.ok) {
+        throw new Error('Failed to load scoreboard');
+      }
+      const data = await res.json();
+      const entries = Array.isArray(data.entries) ? data.entries : [];
+      setLeaderboardEntries(entries);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(SCOREBOARD_CACHE_KEY, JSON.stringify(entries));
+      }
+    } catch (error) {
+      if (typeof window !== 'undefined') {
+        const cached = window.localStorage.getItem(SCOREBOARD_CACHE_KEY);
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed)) {
+              setLeaderboardEntries(parsed);
+              setLeaderboardError('Live scoreboard unavailable. Showing cached results.');
+              return;
+            }
+          } catch {
+            // Ignore cache parse failures and show default error below.
+          }
+        }
+      }
+      setLeaderboardError(error instanceof Error ? error.message : 'Could not load scoreboard');
+    } finally {
+      setLeaderboardLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showScoreboard) {
+      loadScoreboard();
+    }
+  }, [showScoreboard]);
 
   if (gameState === 'playing') {
     return <Game onExit={() => setGameState('start')} musicVolume={musicVolume} setMusicVolume={setMusicVolume} />;
@@ -76,6 +132,18 @@ export default function App() {
               <Sword className="w-5 h-5 scale-x-[-1]" />
             </span>
           </motion.button>
+
+          <motion.button
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.5 }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setShowScoreboard(true)}
+            className="px-6 py-3 bg-zinc-900/90 border border-amber-800/50 hover:border-amber-500/60 rounded-sm text-amber-300 hover:text-amber-200 font-serif transition-colors"
+          >
+            View Scoreboard
+          </motion.button>
         </div>
 
         {/* Scroll Indicator */}
@@ -132,6 +200,53 @@ export default function App() {
           </div>
         </div>
       </section>
+
+      {showScoreboard && (
+        <div
+          className="fixed inset-0 z-50 bg-zinc-950/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowScoreboard(false)}
+        >
+          <div
+            className="w-full max-w-2xl max-h-[85vh] overflow-hidden rounded-2xl border border-amber-900/60 bg-zinc-900 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+              <h3 className="text-2xl font-serif text-amber-300">Top 30 Scoreboard</h3>
+              <button
+                onClick={() => setShowScoreboard(false)}
+                className="text-zinc-400 hover:text-zinc-200 text-sm"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="p-4 sm:p-6 max-h-[70vh] overflow-y-auto">
+              {leaderboardLoading && <p className="text-zinc-400">Loading scoreboard...</p>}
+              {leaderboardError && <p className="text-red-400">{leaderboardError}</p>}
+
+              {!leaderboardLoading && !leaderboardError && leaderboardEntries.length === 0 && (
+                <p className="text-zinc-400">No scores yet. Be the first legend.</p>
+              )}
+
+              {!leaderboardLoading && !leaderboardError && leaderboardEntries.length > 0 && (
+                <div className="space-y-2">
+                  {leaderboardEntries.map((entry, index) => (
+                    <div
+                      key={entry.id}
+                      className="grid grid-cols-[56px_1fr_90px_70px] items-center gap-3 rounded-lg px-3 py-2 bg-zinc-950/70 border border-zinc-800"
+                    >
+                      <div className="text-amber-400 font-semibold">#{index + 1}</div>
+                      <div className="text-zinc-200 truncate">{entry.name}</div>
+                      <div className="text-amber-200 text-right font-semibold">{entry.score}</div>
+                      <div className="text-zinc-400 text-right">L{entry.level}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

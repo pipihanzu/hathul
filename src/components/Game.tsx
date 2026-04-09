@@ -88,9 +88,15 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
   const [availablePotions, setAvailablePotions] = useState<PotionDef[]>([]);
   const [activePotionEffects, setActivePotionEffects] = useState<PotionEffect[]>([]);
   const [score, setScore] = useState(0);
-  const [scoreEvents, setScoreEvents] = useState<{ id: number; amount: number; label: string; type: 'gain' | 'bonus' }[]>([]);
+  const [scoreEvents, setScoreEvents] = useState<{ id: number; amount: number; label: string; type: 'gain' | 'bonus'; startX: number; startY: number; dx: number; dy: number }[]>([]);
   const scoreEventIdRef = useRef(0);
   const scoreTimeoutsRef = useRef<Record<number, number>>({});
+  const scoreTargetRef = useRef<HTMLDivElement>(null);
+  const [leaderboardState, setLeaderboardState] = useState<'idle' | 'checking' | 'eligible' | 'ineligible' | 'saving' | 'saved' | 'error'>('idle');
+  const [leaderboardName, setLeaderboardName] = useState('');
+  const [leaderboardMessage, setLeaderboardMessage] = useState<string | null>(null);
+  const [leaderboardRank, setLeaderboardRank] = useState<number | null>(null);
+  const hasCheckedLeaderboardRef = useRef(false);
 
   const SCORE_BASE_ROLL = 10;
   const SCORE_CRITICAL_ROLL = 30;
@@ -107,16 +113,41 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
     setScore(prev => prev + amount);
   };
 
+  const getScoreFlightPath = () => {
+    if (typeof window === 'undefined') {
+      return { startX: 0, startY: 0, dx: 0, dy: 0 };
+    }
+
+    const startX = window.innerWidth / 2;
+    const startY = window.innerHeight / 2;
+
+    if (!scoreTargetRef.current) {
+      return { startX, startY, dx: 0, dy: -220 };
+    }
+
+    const rect = scoreTargetRef.current.getBoundingClientRect();
+    const targetX = rect.left + rect.width / 2;
+    const targetY = rect.top + rect.height / 2;
+
+    return {
+      startX,
+      startY,
+      dx: targetX - startX,
+      dy: targetY - startY,
+    };
+  };
+
   const addScoreEvent = (amount: number, label: string, type: 'gain' | 'bonus' = 'gain') => {
     if (amount === 0) return;
     addScore(amount);
     const id = scoreEventIdRef.current++;
-    setScoreEvents(prev => [{ id, amount, label, type }, ...prev]);
+    const flight = getScoreFlightPath();
+    setScoreEvents(prev => [{ id, amount, label, type, ...flight }, ...prev]);
 
     const timer = window.setTimeout(() => {
       setScoreEvents(prev => prev.filter(event => event.id !== id));
       delete scoreTimeoutsRef.current[id];
-    }, 3200);
+    }, 900);
 
     scoreTimeoutsRef.current[id] = timer;
   };
@@ -156,6 +187,11 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
     setIsCriticalHit(false);
     setIsWaitingForNextTurn(false);
     setLogs([]);
+    setLeaderboardState('idle');
+    setLeaderboardName('');
+    setLeaderboardMessage(null);
+    setLeaderboardRank(null);
+    hasCheckedLeaderboardRef.current = false;
     
     if (lvl > 1 && levelUpAudioRef.current) {
       levelUpAudioRef.current.currentTime = 0;
@@ -487,6 +523,121 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
     }
   };
 
+  const checkLeaderboardQualification = async () => {
+    setLeaderboardState('checking');
+    setLeaderboardMessage(null);
+
+    try {
+      const res = await fetch(`/api/scoreboard/qualify?score=${score}&level=${level}`);
+      if (!res.ok) {
+        throw new Error('Leaderboard service unavailable. Start both services with: npm run dev');
+      }
+      const data = await res.json();
+
+      if (data.qualifies) {
+        setLeaderboardState('eligible');
+        setLeaderboardRank(typeof data.rank === 'number' ? data.rank : null);
+      } else {
+        setLeaderboardState('ineligible');
+        setLeaderboardMessage('Score did not reach the top 30 leaderboard.');
+      }
+    } catch (error) {
+      setLeaderboardState('error');
+      setLeaderboardMessage(error instanceof Error ? error.message : 'Could not check leaderboard. Start both services with: npm run dev');
+    }
+  };
+
+  useEffect(() => {
+    const gameEnded = gameState === 'gameOver' || gameState === 'gameWon';
+    if (!gameEnded) return;
+    if (hasCheckedLeaderboardRef.current) return;
+
+    hasCheckedLeaderboardRef.current = true;
+    checkLeaderboardQualification();
+  }, [gameState, score, level]);
+
+  const submitLeaderboardScore = async () => {
+    const cleanedName = leaderboardName.trim();
+    if (!/^[A-Za-z0-9 ]{1,24}$/.test(cleanedName)) {
+      setLeaderboardMessage('Name must be letters/numbers only (max 24).');
+      return;
+    }
+
+    setLeaderboardState('saving');
+    setLeaderboardMessage(null);
+
+    try {
+      const res = await fetch('/api/scoreboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: cleanedName, score, level }),
+      });
+
+      if (!res.ok) {
+        const errorPayload = await res.json().catch(() => ({}));
+        throw new Error(errorPayload.error || 'Failed to submit score. Ensure API is running (npm run dev).');
+      }
+
+      const data = await res.json();
+      setLeaderboardRank(typeof data.rank === 'number' ? data.rank : leaderboardRank);
+      setLeaderboardState('saved');
+      setLeaderboardMessage('Score saved to leaderboard.');
+    } catch (error) {
+      setLeaderboardState('error');
+      setLeaderboardMessage(error instanceof Error ? error.message : 'Failed to save score. Ensure API is running (npm run dev).');
+    }
+  };
+
+  const renderLeaderboardPanel = () => {
+    if (leaderboardState === 'idle') return null;
+
+    return (
+      <div className="mt-4 p-4 rounded-lg border border-amber-900/50 bg-zinc-900/70 space-y-3 text-left">
+        <div className="text-amber-300 font-semibold">Leaderboard Check</div>
+
+        {leaderboardState === 'checking' && (
+          <p className="text-zinc-300 text-sm">Checking top 30 leaderboard...</p>
+        )}
+
+        {(leaderboardState === 'ineligible' || leaderboardState === 'error') && (
+          <p className="text-zinc-300 text-sm">{leaderboardMessage}</p>
+        )}
+
+        {leaderboardState === 'eligible' && (
+          <>
+            <p className="text-zinc-200 text-sm">
+              Qualified for leaderboard{leaderboardRank ? ` at #${leaderboardRank}` : ''}. Enter your name:
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                value={leaderboardName}
+                onChange={(e) => setLeaderboardName(e.target.value.replace(/[^A-Za-z0-9 ]/g, '').slice(0, 24))}
+                placeholder="Name (letters/numbers only)"
+                className="flex-1 px-3 py-2 rounded bg-zinc-950 border border-zinc-700 text-zinc-200 outline-none focus:border-amber-500"
+                maxLength={24}
+              />
+              <button
+                onClick={submitLeaderboardScore}
+                className="px-4 py-2 rounded bg-amber-600 hover:bg-amber-500 text-zinc-950 font-semibold"
+              >
+                Submit
+              </button>
+            </div>
+            {leaderboardMessage && <p className="text-zinc-300 text-sm">{leaderboardMessage}</p>}
+          </>
+        )}
+
+        {leaderboardState === 'saving' && (
+          <p className="text-zinc-300 text-sm">Saving score...</p>
+        )}
+
+        {leaderboardState === 'saved' && (
+          <p className="text-amber-200 text-sm">Saved. Current rank: #{leaderboardRank ?? '-'}</p>
+        )}
+      </div>
+    );
+  };
+
   if (!cat) return null;
 
   const currentGoblin = GOBLINS[level - 1];
@@ -516,7 +667,7 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
           <div className="text-zinc-500 text-xs">Level {level} / 9</div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="text-amber-200 text-sm font-semibold">Score: {score}</div>
+          <div ref={scoreTargetRef} className="text-amber-200 text-sm font-semibold">Score: {score}</div>
           <button
             onClick={() => setShowVolumeModal(true)}
             className="text-xs px-3 py-1 rounded-full border border-amber-500 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 transition-colors"
@@ -527,19 +678,17 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
         </div>
       </header>
 
-      <div className="absolute top-[84px] right-4 z-40 flex flex-col items-end gap-2 pointer-events-none">
+      <div className="fixed inset-0 z-40 pointer-events-none">
         <AnimatePresence>
           {scoreEvents.map((event) => (
             <motion.div
               key={event.id}
-              initial={{ opacity: 0, y: 18, x: 10, scale: 0.96 }}
-              animate={{ opacity: 1, y: -2, x: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -24, x: 6, scale: 0.96 }}
-              transition={{ duration: 0.28, ease: 'easeOut' }}
-              className={cn(
-                'rounded-full px-4 py-2 text-sm font-semibold shadow-2xl text-white backdrop-blur-sm',
-                event.type === 'bonus' ? 'bg-sky-500/95' : 'bg-amber-500/95'
-              )}
+              initial={{ opacity: 0, scale: 0.75, x: 0, y: 0 }}
+              animate={{ opacity: [0, 1, 1, 0.9], scale: [0.75, 1.08, 0.95], x: event.dx, y: event.dy }}
+              exit={{ opacity: 0, scale: 0.85 }}
+              transition={{ duration: 0.75, ease: 'easeOut' }}
+              className="fixed rounded-full px-4 py-2 text-sm font-bold shadow-2xl text-zinc-950 bg-gradient-to-r from-amber-400 to-yellow-300 border border-amber-100/80"
+              style={{ left: event.startX, top: event.startY }}
             >
               +{event.amount} {event.label}
             </motion.div>
@@ -799,6 +948,7 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
                     </div>
                   </div>
                   <p className="text-zinc-400">You killed {cat.name}. The guilt is unbearable.</p>
+                  {renderLeaderboardPanel()}
                   <button onClick={onExit} className="px-8 py-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-sm font-serif text-xl w-full transition-colors">
                     Main Menu
                   </button>
@@ -819,6 +969,7 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
                 <>
                   <h2 className="text-5xl font-serif text-amber-500">Victory!</h2>
                   <p className="text-zinc-400">You survived all 9 levels. The cats are safe.</p>
+                  {renderLeaderboardPanel()}
                   <button onClick={() => startLevel(1)} className="px-8 py-4 bg-amber-600 hover:bg-amber-500 text-zinc-950 rounded-sm font-serif text-xl w-full transition-colors">
                     Play Again
                   </button>
