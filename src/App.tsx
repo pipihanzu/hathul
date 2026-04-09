@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 import { motion } from 'motion/react';
+import { Analytics } from '@vercel/analytics/next';
 import { ChevronDown, Sword } from 'lucide-react';
 import Game from './components/Game';
 
