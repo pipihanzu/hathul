@@ -183,7 +183,7 @@ export default function App() {
 
           <div className="prose prose-invert prose-amber mx-auto font-sans text-zinc-400 leading-relaxed space-y-6">
             <p>
-              Welcome, brave adventurer, to Hathul—a high-stakes, low-morality D&D mini-game.
+              Welcome, brave adventurer, to Hathul - a high-stakes, low-morality D&D mini-game.
             </p>
             <p>
               The premise is simple: You and a goblin are taking turns swinging at a poor, defenseless cat. Why? Don't ask questions, just roll the d20.
