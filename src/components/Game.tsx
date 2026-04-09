@@ -584,65 +584,72 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-amber-900/10 via-transparent to-transparent pointer-events-none" />
           
           <motion.div 
-            key={cat.name}
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ 
-              scale: 1, 
-              opacity: 1,
-              x: damageResult !== null ? [-5, 5, -5, 5, 0] : 0
-            }}
-            transition={{ duration: damageResult !== null ? 0.4 : 0.3 }}
-            className="flex flex-col items-center gap-2 sm:gap-3"
+            animate={{ y: [0, -5, 0], rotateX: [2, 3, 2], rotateY: [-1, 1, -1] }}
+            transition={{ repeat: Infinity, duration: 5.2, ease: "easeInOut" }}
+            className="bg-zinc-900/95 rounded-2xl shadow-2xl p-4 transform-gpu"
+            style={{ transform: 'perspective(1000px) translateZ(24px)', transformStyle: 'preserve-3d' }}
           >
-            <div className="relative">
-              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden flex items-center justify-center">
-                <img 
-                  src={`/images/cats/cat_${level}.png`} 
-                  alt={cat.name}
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-              {/* Damage Indicator */}
-              <AnimatePresence>
-                {damageResult !== null && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, y: -30, scale: 1.2 }}
-                    exit={{ opacity: 0 }}
-                    className={cn(
-                      "absolute top-0 left-1/2 -translate-x-1/2 font-bold font-serif drop-shadow-md whitespace-nowrap",
-                      isCriticalHit ? "text-purple-400 text-3xl" : "text-red-500 text-xl"
-                    )}
-                  >
-                    -{damageResult} {isCriticalHit && "CRIT!"}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-            
-            <div className="text-center space-y-1 sm:space-y-2">
-              <h2 className="text-xl font-serif text-amber-100">{cat.name}</h2>
-              <div className="flex items-center justify-center gap-3 text-xs">
-                <div className="flex items-center gap-1 text-red-400" title="Health Points">
-                  <Heart className="w-3 h-3" />
-                  <span>{cat.hp} / {cat.maxHp}</span>
+            <motion.div 
+              key={cat.name}
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ 
+                scale: 1, 
+                opacity: 1,
+                x: damageResult !== null ? [-5, 5, -5, 5, 0] : 0
+              }}
+              transition={{ duration: damageResult !== null ? 0.4 : 0.3 }}
+              className="flex flex-col items-center gap-2 sm:gap-3"
+            >
+              <div className="relative">
+                <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-2xl bg-zinc-900/80 shadow-2xl transform rotate-1 hover:rotate-0 transition-transform duration-300 flex items-center justify-center overflow-hidden">
+                  <img 
+                    src={`/images/cats/cat_${level}.png`} 
+                    alt={cat.name}
+                    className="w-full h-full object-cover rounded-2xl"
+                    referrerPolicy="no-referrer"
+                  />
                 </div>
-                <div className="flex items-center gap-1 text-blue-400" title="Armor Class">
-                  <Shield className="w-3 h-3" />
-                  <span>{cat.ac}</span>
+                {/* Damage Indicator */}
+                <AnimatePresence>
+                  {damageResult !== null && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 0, scale: 0.5 }}
+                      animate={{ opacity: 1, y: -30, scale: 1.2 }}
+                      exit={{ opacity: 0 }}
+                      className={cn(
+                        "absolute top-0 left-1/2 -translate-x-1/2 font-bold font-serif drop-shadow-md whitespace-nowrap",
+                        isCriticalHit ? "text-purple-400 text-3xl" : "text-red-500 text-xl"
+                      )}
+                    >
+                      -{damageResult} {isCriticalHit && "CRIT!"}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+              
+              <div className="text-center space-y-1 sm:space-y-2">
+                <h2 className="text-xl font-serif text-amber-100">{cat.name}</h2>
+                <div className="flex items-center justify-center gap-3 text-xs">
+                  <div className="flex items-center gap-1 text-red-400" title="Health Points">
+                    <Heart className="w-3 h-3" />
+                    <span>{cat.hp} / {cat.maxHp}</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-blue-400" title="Armor Class">
+                    <Shield className="w-3 h-3" />
+                    <span>{cat.ac}</span>
+                  </div>
+                </div>
+                {/* Health Bar */}
+                <div className="w-36 sm:w-40 h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-1 mx-auto">
+                  <motion.div 
+                    className="h-full bg-red-500"
+                    initial={{ width: '100%' }}
+                    animate={{ width: `${Math.max(0, (cat.hp / cat.maxHp) * 100)}%` }}
+                    transition={{ duration: 0.5 }}
+                  />
                 </div>
               </div>
-              {/* Health Bar */}
-              <div className="w-36 sm:w-40 h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-1 mx-auto">
-                <motion.div 
-                  className="h-full bg-red-500"
-                  initial={{ width: '100%' }}
-                  animate={{ width: `${Math.max(0, (cat.hp / cat.maxHp) * 100)}%` }}
-                  transition={{ duration: 0.5 }}
-                />
-              </div>
-            </div>
+            </motion.div>
           </motion.div>
         </div>
 

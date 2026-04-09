@@ -144,8 +144,10 @@ const GameDice: React.FC<DiceProps> = ({ rolling, result, roller, type = 'd20', 
       // Smoothly interpolate to target rotation
       meshRef.current.quaternion.slerp(targetQuaternion, delta * 10);
       
-      // Return to center
-      meshRef.current.position.lerp(new THREE.Vector3(0, 0, 0), delta * 5);
+      // Settle 100px below vertical center while keeping horizontal center.
+      const worldUnitsPerPixel = state.viewport.height / state.size.height;
+      const targetY = -200 * worldUnitsPerPixel;
+      meshRef.current.position.lerp(new THREE.Vector3(0, targetY, 0), delta * 5);
     }
   });
 
