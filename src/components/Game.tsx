@@ -68,6 +68,13 @@ export default function Game({ onExit }: { onExit: () => void }) {
   const [logs, setLogs] = useState<{ id: number; text: string; type: 'info' | 'hit' | 'miss' | 'fatal' }[]>([]);
   const logIdRef = useRef(0);
   const logContainerRef = useRef<HTMLDivElement>(null);
+  const diceRollAudioRef = useRef<HTMLAudioElement>(null);
+  const missAudioRef = useRef<HTMLAudioElement>(null);
+  const hitAudioRef = useRef<HTMLAudioElement>(null);
+  const yourTurnAudioRef = useRef<HTMLAudioElement>(null);
+  const goblinLossAudioRef = useRef<HTMLAudioElement>(null);
+  const goblinWinAudioRef = useRef<HTMLAudioElement>(null);
+  const levelUpAudioRef = useRef<HTMLAudioElement>(null);
 
   const [availablePotions, setAvailablePotions] = useState<PotionDef[]>([]);
   const [activePotionEffects, setActivePotionEffects] = useState<PotionEffect[]>([]);
@@ -101,6 +108,11 @@ export default function Game({ onExit }: { onExit: () => void }) {
     setIsWaitingForNextTurn(false);
     setLogs([]);
     
+    if (lvl > 1 && levelUpAudioRef.current) {
+      levelUpAudioRef.current.currentTime = 0;
+      levelUpAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
+    }
+    
     const numPotions = Math.min(6, lvl + 1);
     setAvailablePotions(POTIONS_DB.slice(0, numPotions));
     setActivePotionEffects([]);
@@ -125,6 +137,12 @@ export default function Game({ onExit }: { onExit: () => void }) {
       setRollResult(null);
       setDamageResult(null);
       
+      // Play dice roll sound
+      if (diceRollAudioRef.current) {
+        diceRollAudioRef.current.currentTime = 0;
+        diceRollAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
+      }
+      
       const attackerName = turn === 'player' ? 'Player' : GOBLINS[level - 1].name;
       addLog(`${attackerName} is rolling to hit...`, 'info');
 
@@ -136,6 +154,13 @@ export default function Game({ onExit }: { onExit: () => void }) {
     } else if (rollPhase === 'waiting-d6' && turn === 'player') {
       setRollPhase('d6');
       setRollResult(null);
+      
+      // Play dice roll sound
+      if (diceRollAudioRef.current) {
+        diceRollAudioRef.current.currentTime = 0;
+        diceRollAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
+      }
+      
       addLog(`Player is rolling damage...`, 'info');
       
       setTimeout(() => {
@@ -163,6 +188,14 @@ export default function Game({ onExit }: { onExit: () => void }) {
       return () => clearTimeout(timer);
     }
   }, [turn, gameState, rollPhase, cat]);
+
+  // Play sound when player's turn starts
+  useEffect(() => {
+    if (turn === 'player' && gameState === 'playing' && yourTurnAudioRef.current) {
+      yourTurnAudioRef.current.currentTime = 0;
+      yourTurnAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
+    }
+  }, [turn, gameState]);
 
   const usePotion = (potion: PotionDef) => {
     if (turn !== 'player' || rollPhase !== 'idle' || gameState !== 'playing') return;
@@ -226,6 +259,12 @@ export default function Game({ onExit }: { onExit: () => void }) {
       if (hit) {
         addLog(`Hit!`, 'hit');
         
+        // Play hit sound
+        if (hitAudioRef.current) {
+          hitAudioRef.current.currentTime = 0;
+          hitAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
+        }
+        
         if (turn === 'player') {
           setRollPhase('waiting-d6');
           addLog(`Waiting for Player to roll damage...`, 'info');
@@ -244,6 +283,12 @@ export default function Game({ onExit }: { onExit: () => void }) {
         }
       } else {
         addLog(`Miss!`, 'miss');
+        
+        // Play miss sound
+        if (missAudioRef.current) {
+          missAudioRef.current.currentTime = 0;
+          missAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
+        }
         
         // Pause before switching turns
         setIsWaitingForNextTurn(true);
@@ -277,9 +322,18 @@ export default function Game({ onExit }: { onExit: () => void }) {
           setRollPhase('idle');
           setRollResult(null);
           if (turn === 'player') {
+            if (goblinWinAudioRef.current) {
+              goblinWinAudioRef.current.currentTime = 0;
+              goblinWinAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
+            }
             addLog(`You killed ${cat.name}. You lose!`, 'fatal');
             setGameState('gameOver');
           } else {
+            // Opponent kills the cat
+            if (goblinLossAudioRef.current) {
+              goblinLossAudioRef.current.currentTime = 0;
+              goblinLossAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
+            }
             addLog(`${attackerName} killed ${cat.name}. You survive!`, 'info');
             if (level === 9) {
               setGameState('gameWon');
@@ -555,6 +609,15 @@ export default function Game({ onExit }: { onExit: () => void }) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Hidden audio elements for sound effects */}
+      <audio ref={diceRollAudioRef} src="/sounds/diceroll.wav" preload="auto" />
+      <audio ref={missAudioRef} src="/sounds/miss.wav" preload="auto" />
+      <audio ref={hitAudioRef} src="/sounds/cathit.wav" preload="auto" />
+      <audio ref={yourTurnAudioRef} src="/sounds/yourturn.wav" preload="auto" />
+      <audio ref={goblinLossAudioRef} src="/sounds/goblinloss.wav" preload="auto" />
+      <audio ref={goblinWinAudioRef} src="/sounds/goblinwin.wav" preload="auto" />
+      <audio ref={levelUpAudioRef} src="/sounds/levelup.wav" preload="auto" />
     </div>
   );
 }
