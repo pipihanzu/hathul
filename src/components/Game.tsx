@@ -98,6 +98,9 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
   const [leaderboardMessage, setLeaderboardMessage] = useState<string | null>(null);
   const [leaderboardRank, setLeaderboardRank] = useState<number | null>(null);
   const hasCheckedLeaderboardRef = useRef(false);
+  const [potionPreview, setPotionPreview] = useState<{ id: number; icon: string; name: string; desc: string } | null>(null);
+  const potionPreviewIdRef = useRef(0);
+  const potionPreviewTimeoutRef = useRef<number | null>(null);
 
   const SCORE_BASE_ROLL = 10;
   const SCORE_CRITICAL_ROLL = 30;
@@ -167,6 +170,9 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
   useEffect(() => {
     return () => {
       Object.values(scoreTimeoutsRef.current).forEach(clearTimeout);
+      if (potionPreviewTimeoutRef.current !== null) {
+        window.clearTimeout(potionPreviewTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -356,6 +362,16 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
       drinkAudioRef.current.currentTime = 0;
       drinkAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
     }
+
+    const previewId = potionPreviewIdRef.current++;
+    setPotionPreview({ id: previewId, icon: potion.icon, name: potion.name, desc: potion.desc });
+    if (potionPreviewTimeoutRef.current !== null) {
+      window.clearTimeout(potionPreviewTimeoutRef.current);
+    }
+    potionPreviewTimeoutRef.current = window.setTimeout(() => {
+      setPotionPreview(null);
+      potionPreviewTimeoutRef.current = null;
+    }, 1500);
     
     setAvailablePotions(prev => prev.filter(p => p.id !== potion.id));
     
@@ -701,6 +717,29 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
           ))}
         </AnimatePresence>
       </div>
+
+      <AnimatePresence>
+        {potionPreview && (
+          <motion.div
+            key={potionPreview.id}
+            initial={{ opacity: 0, y: 0, scale: 0.92 }}
+            animate={{ opacity: 1, y: -8, scale: 1 }}
+            exit={{ opacity: 0, y: 120, scale: 0.95 }}
+            transition={{ duration: 0.24, ease: 'easeInOut' }}
+            className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center"
+          >
+            <div className="w-[360px] max-w-[90vw] rounded-2xl border border-amber-400/60 bg-zinc-900/95 shadow-2xl p-6 flex flex-col items-center justify-center gap-4">
+              <img
+                src={potionPreview.icon}
+                alt={potionPreview.name}
+                className="w-[292px] h-[292px] max-w-[70vw] max-h-[50vh] object-contain"
+                referrerPolicy="no-referrer"
+              />
+              <p className="text-amber-100 text-sm text-center leading-snug">{potionPreview.desc}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Battlefield */}
       <main className="flex-1 min-h-0 flex flex-col p-2 gap-2 sm:gap-4 max-w-2xl mx-auto w-full z-10">
