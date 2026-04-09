@@ -179,9 +179,9 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
   const startLevel = (lvl: number) => {
     const newCat: CatEntity = {
       name: CAT_NAMES[Math.floor(Math.random() * CAT_NAMES.length)],
-      hp: lvl === 1 ? Math.floor(Math.random() * 7) + 6 : Math.floor(Math.random() * 30) + 1, // 6-12 for lvl 1, else 1-30
+      hp: Math.floor(Math.random() * 9) + 4, // 4-12
       maxHp: 30,
-      ac: Math.floor(Math.random() * 13) + 3, // 3-15
+      ac: Math.floor(Math.random() * 7) + 4, // 4-10
     };
     newCat.maxHp = newCat.hp;
     
