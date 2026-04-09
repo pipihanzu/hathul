@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 
 import { ChevronDown, Sword } from 'lucide-react';
@@ -11,15 +11,125 @@ import Game from './components/Game';
 
 export default function App() {
   const [gameState, setGameState] = useState<'start' | 'playing'>('start');
+  const tavernMusicRef = useRef<HTMLAudioElement>(null);
+  const hasUserInteracted = useRef(false);
+  const [musicVolume, setMusicVolume] = useState(() => {
+    if (typeof window === 'undefined') return 0.5;
+    const stored = window.localStorage.getItem('hathul-music-volume');
+    return stored === null ? 0.5 : parseFloat(stored);
+  });
+  const [showVolumeModal, setShowVolumeModal] = useState(false);
+
+  useEffect(() => {
+    if (!tavernMusicRef.current) return;
+
+    const volumeMultiplier = musicVolume <= 0.5
+      ? musicVolume * 0.3
+      : 0.15 + (musicVolume - 0.5) * 0.7;
+    tavernMusicRef.current.volume = volumeMultiplier;
+
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('hathul-music-volume', musicVolume.toString());
+    }
+
+    if (gameState === 'start') {
+      const timer = window.setTimeout(() => {
+        tavernMusicRef.current?.play().catch(() => {});
+      }, 200);
+      return () => window.clearTimeout(timer);
+    }
+
+    tavernMusicRef.current.pause();
+  }, [gameState, musicVolume]);
+
+  useEffect(() => {
+    const onUserInteraction = () => {
+      hasUserInteracted.current = true;
+      if (tavernMusicRef.current) {
+        tavernMusicRef.current.muted = false;
+        tavernMusicRef.current.play().catch(() => {});
+      }
+    };
+
+    window.addEventListener('pointerdown', onUserInteraction, { once: true });
+    window.addEventListener('keydown', onUserInteraction, { once: true });
+
+    return () => {
+      window.removeEventListener('pointerdown', onUserInteraction);
+      window.removeEventListener('keydown', onUserInteraction);
+    };
+  }, []);
 
   if (gameState === 'playing') {
-    return <Game onExit={() => setGameState('start')} />;
+    return <Game onExit={() => setGameState('start')} musicVolume={musicVolume} setMusicVolume={setMusicVolume} />;
   }
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-200 font-sans overflow-x-hidden">
       {/* Hero Section */}
       <section className="relative min-h-[100svh] flex flex-col items-center justify-center p-6 text-center">
+        {/* Header with Music Volume Control */}
+        <div className="absolute top-6 right-6 z-20">
+          <button
+            onClick={() => {
+              hasUserInteracted.current = true;
+              if (tavernMusicRef.current) {
+                tavernMusicRef.current.muted = false;
+                tavernMusicRef.current.play().catch(() => {});
+              }
+              setShowVolumeModal(true);
+            }}
+            className="text-xs px-3 py-1 rounded-full border border-amber-500 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 transition-colors"
+          >
+            Music {Math.round(musicVolume * 100)}%
+          </button>
+        </div>
+
+        {/* Volume Control Modal */}
+        {showVolumeModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowVolumeModal(false)}
+            className="fixed inset-0 z-50 bg-zinc-950/60 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-zinc-900/95 border border-zinc-800 rounded-xl p-8 max-w-sm w-full space-y-6 shadow-2xl"
+            >
+              <h3 className="font-serif text-2xl text-amber-200 text-center">Music Volume</h3>
+              
+              <div className="space-y-3">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={Math.round(musicVolume * 100)}
+                  onChange={(e) => setMusicVolume(parseInt(e.target.value) / 100)}
+                  className="w-full h-3 bg-zinc-700 rounded-full appearance-none cursor-pointer accent-amber-500"
+                  style={{
+                    WebkitAppearance: 'slider-horizontal',
+                  }}
+                />
+                <div className="text-center text-amber-200 font-semibold text-lg">
+                  {Math.round(musicVolume * 100)}%
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowVolumeModal(false)}
+                className="w-full px-6 py-3 bg-amber-600 hover:bg-amber-500 text-zinc-950 rounded-lg font-serif text-lg transition-colors"
+              >
+                Close
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+
         {/* Background decorative elements */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-zinc-900 via-zinc-950 to-zinc-950 opacity-80 pointer-events-none" />
         
@@ -127,6 +237,8 @@ export default function App() {
           </div>
         </div>
       </section>
+
+      <audio ref={tavernMusicRef} src="/sounds/tavernBlaze.mp3" preload="auto" autoPlay muted loop />
     </div>
   );
 }

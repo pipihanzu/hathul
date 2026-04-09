@@ -53,7 +53,7 @@ const GOBLINS: Goblin[] = [
 
 const CAT_NAMES = ["Sir Pounce", "Mittens", "Shadow", "Luna", "Whiskers", "Balthazar", "Meowth", "Professor Fluff"];
 
-export default function Game({ onExit }: { onExit: () => void }) {
+export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: () => void; musicVolume: number; setMusicVolume: (value: number) => void; }) {
   const [level, setLevel] = useState(1);
   const [cat, setCat] = useState<CatEntity | null>(null);
   const [turn, setTurn] = useState<'player' | 'opponent'>('player');
@@ -83,6 +83,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
     const stored = window.localStorage.getItem('hathul-music-enabled');
     return stored === null ? true : stored === 'true';
   });
+  const [showVolumeModal, setShowVolumeModal] = useState(false);
 
   const [availablePotions, setAvailablePotions] = useState<PotionDef[]>([]);
   const [activePotionEffects, setActivePotionEffects] = useState<PotionEffect[]>([]);
@@ -267,24 +268,28 @@ export default function Game({ onExit }: { onExit: () => void }) {
   useEffect(() => {
     if (!musicAudioRef.current) return;
     musicAudioRef.current.loop = true;
-    musicAudioRef.current.volume = 0.35;
+    // Non-linear volume curve: 50% stays at 0.15, 100% reaches 0.5
+    const volumeMultiplier = musicVolume <= 0.5 
+      ? musicVolume * 0.3 
+      : 0.15 + (musicVolume - 0.5) * 0.7;
+    musicAudioRef.current.volume = volumeMultiplier;
 
     const playMusic = () => {
-      if (!musicEnabled || !musicAudioRef.current) return;
+      if (musicVolume === 0 || !musicAudioRef.current) return;
       musicAudioRef.current.currentTime = 0;
       musicAudioRef.current.play().catch(() => {
         // Autoplay may be blocked until user interacts.
       });
     };
 
-    if (musicEnabled) {
+    if (musicVolume > 0) {
       playMusic();
     } else {
       musicAudioRef.current.pause();
     }
 
     const onUserInteraction = () => {
-      if (musicEnabled && musicAudioRef.current && musicAudioRef.current.paused) {
+      if (musicVolume > 0 && musicAudioRef.current && musicAudioRef.current.paused) {
         musicAudioRef.current.play().catch(() => {});
       }
       window.removeEventListener('pointerdown', onUserInteraction);
@@ -294,15 +299,20 @@ export default function Game({ onExit }: { onExit: () => void }) {
     window.addEventListener('pointerdown', onUserInteraction, { once: true });
     window.addEventListener('keydown', onUserInteraction, { once: true });
 
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('hathul-music-enabled', musicEnabled.toString());
-    }
-
     return () => {
       window.removeEventListener('pointerdown', onUserInteraction);
       window.removeEventListener('keydown', onUserInteraction);
     };
-  }, [musicEnabled]);
+  }, [musicVolume]);
+
+  useEffect(() => {
+    if (!musicAudioRef.current) return;
+    if (gameState !== 'playing') {
+      musicAudioRef.current.pause();
+    } else if (musicVolume > 0) {
+      musicAudioRef.current.play().catch(() => {});
+    }
+  }, [gameState, musicVolume]);
 
   const usePotion = (potion: PotionDef) => {
     if (turn !== 'player' || rollPhase !== 'idle' || gameState !== 'playing') return;
@@ -437,18 +447,16 @@ export default function Game({ onExit }: { onExit: () => void }) {
           setRollPhase('idle');
           setRollResult(null);
           if (turn === 'player') {
-            if (goblinWinAudioRef.current) {
-              goblinWinAudioRef.current.currentTime = 0;
-              goblinWinAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
-            }
             addLog(`You killed ${cat.name}. You lose!`, 'fatal');
             setGameState('gameOver');
+            setTimeout(() => {
+              if (goblinWinAudioRef.current) {
+                goblinWinAudioRef.current.currentTime = 0;
+                goblinWinAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
+              }
+            }, 200);
           } else {
             // Opponent kills the cat
-            if (goblinLossAudioRef.current) {
-              goblinLossAudioRef.current.currentTime = 0;
-              goblinLossAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
-            }
             addLog(`${attackerName} killed ${cat.name}. You survive!`, 'info');
             addScoreEvent(SCORE_LEVEL_PASS, `Level Clear +${SCORE_LEVEL_PASS}`, 'bonus');
             if (level === 9) {
@@ -457,6 +465,12 @@ export default function Game({ onExit }: { onExit: () => void }) {
             } else {
               setGameState('levelComplete');
             }
+            setTimeout(() => {
+              if (goblinLossAudioRef.current) {
+                goblinLossAudioRef.current.currentTime = 0;
+                goblinLossAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
+              }
+            }, 200);
           }
           setIsWaitingForNextTurn(false);
         }, 1500);
@@ -505,13 +519,10 @@ export default function Game({ onExit }: { onExit: () => void }) {
         <div className="flex items-center gap-3">
           <div className="text-amber-200 text-sm font-semibold">Score: {score}</div>
           <button
-            onClick={() => setMusicEnabled(prev => !prev)}
-            className={cn(
-              'text-xs px-3 py-1 rounded-full border transition-colors',
-              musicEnabled ? 'border-amber-500 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20' : 'border-zinc-600 bg-zinc-900 text-zinc-400 hover:bg-zinc-800'
-            )}
+            onClick={() => setShowVolumeModal(true)}
+            className="text-xs px-3 py-1 rounded-full border border-amber-500 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 transition-colors"
           >
-            {musicEnabled ? 'Music On' : 'Music Off'}
+            Music {Math.round(musicVolume * 100)}%
           </button>
           <button onClick={onExit} className="text-zinc-500 hover:text-zinc-300 text-xs">Flee</button>
         </div>
@@ -546,7 +557,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
           turn === 'opponent' ? "border-amber-400 bg-amber-950/40 shadow-[0_0_30px_rgba(245,158,11,0.25)] scale-[1.01]" : "border-zinc-700 bg-zinc-900/70"
         )}>
           {turn === 'opponent' && <div className="absolute top-0 left-0 w-1.5 h-full bg-amber-400" />}
-          <div className="w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center shrink-0">
+          <div className="w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center shrink-0">
             <img 
               src={`/images/goblins/icon_${level}.png`} 
               alt={currentGoblin.name}
@@ -710,6 +721,53 @@ export default function Game({ onExit }: { onExit: () => void }) {
         </div>
 
       </main>
+
+      {/* Volume Control Modal */}
+      <AnimatePresence>
+        {showVolumeModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowVolumeModal(false)}
+            className="absolute inset-0 z-40 bg-zinc-950/60 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-zinc-900/95 border border-zinc-800 rounded-xl p-8 max-w-sm w-full space-y-6 shadow-2xl"
+            >
+              <h3 className="font-serif text-2xl text-amber-200 text-center">Music Volume</h3>
+              
+              <div className="space-y-3">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={Math.round(musicVolume * 100)}
+                  onChange={(e) => setMusicVolume(parseInt(e.target.value) / 100)}
+                  className="w-full h-3 bg-zinc-700 rounded-full appearance-none cursor-pointer accent-amber-500"
+                  style={{
+                    WebkitAppearance: 'slider-horizontal',
+                  }}
+                />
+                <div className="text-center text-amber-200 font-semibold text-lg">
+                  {Math.round(musicVolume * 100)}%
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowVolumeModal(false)}
+                className="w-full px-6 py-3 bg-amber-600 hover:bg-amber-500 text-zinc-950 rounded-lg font-serif text-lg transition-colors"
+              >
+                Close
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Game Over / Level Complete Overlays */}
       <AnimatePresence>
