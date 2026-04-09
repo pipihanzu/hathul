@@ -98,6 +98,15 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
   const [leaderboardMessage, setLeaderboardMessage] = useState<string | null>(null);
   const [leaderboardRank, setLeaderboardRank] = useState<number | null>(null);
   const hasCheckedLeaderboardRef = useRef(false);
+  const [gameMusicSrc, setGameMusicSrc] = useState(() => {
+    const tracks = ['/sounds/music1.mp3', '/sounds/music2.mp3', '/sounds/music3.mp3', '/sounds/music4.mp3'];
+    return tracks[Math.floor(Math.random() * tracks.length)];
+  });
+
+  const getRandomTrack = () => {
+    const tracks = ['/sounds/music1.mp3', '/sounds/music2.mp3', '/sounds/music3.mp3', '/sounds/music4.mp3'];
+    return tracks[Math.floor(Math.random() * tracks.length)];
+  };
   const [potionPreview, setPotionPreview] = useState<{ id: number; icon: string; name: string; desc: string } | null>(null);
   const potionPreviewIdRef = useRef(0);
   const potionPreviewTimeoutRef = useRef<number | null>(null);
@@ -199,6 +208,8 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
     setLeaderboardMessage(null);
     setLeaderboardRank(null);
     hasCheckedLeaderboardRef.current = false;
+    
+    setGameMusicSrc(getRandomTrack());
     
     if (lvl > 1 && levelUpAudioRef.current) {
       levelUpAudioRef.current.currentTime = 0;
@@ -356,7 +367,7 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
   }, [gameState, musicVolume]);
 
   const usePotion = (potion: PotionDef) => {
-    if (turn !== 'player' || rollPhase !== 'idle' || gameState !== 'playing') return;
+    if (gameState !== 'playing') return;
 
     if (drinkAudioRef.current) {
       drinkAudioRef.current.currentTime = 0;
@@ -409,11 +420,12 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
     
     let effectiveAc = cat.ac;
 
+    if (activePotionEffects.includes('cat_ac_plus_2')) effectiveAc += 2;
+    if (activePotionEffects.includes('cat_ac_minus_2')) effectiveAc -= 2;
+
     if (turn === 'player') {
       if (activePotionEffects.includes('roll_minus_3')) atkBonus -= 3;
       if (activePotionEffects.includes('roll_plus_3')) atkBonus += 3;
-      if (activePotionEffects.includes('cat_ac_plus_2')) effectiveAc += 2;
-      if (activePotionEffects.includes('cat_ac_minus_2')) effectiveAc -= 2;
     }
     
     if (rollPhase === 'd20') {
@@ -855,10 +867,10 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
               <div key={potion.id} className="w-full h-20 sm:h-24 rounded flex items-center justify-center relative overflow-hidden">
                 <button
                   onClick={() => usePotion(potion)}
-                  disabled={turn !== 'player' || rollPhase !== 'idle' || gameState !== 'playing'}
+                  disabled={gameState !== 'playing'}
                   className={cn(
                     "w-full h-full flex flex-col items-center justify-center gap-1 px-1 transition-all bg-transparent",
-                    (turn === 'player' && rollPhase === 'idle' && gameState === 'playing') ? "hover:brightness-125 cursor-pointer active:scale-95" : "opacity-50 cursor-not-allowed"
+                    gameState === 'playing' ? "hover:brightness-125 cursor-pointer active:scale-95" : "opacity-50 cursor-not-allowed"
                   )}
                   title={`${potion.name}: ${potion.desc}`}
                 >
@@ -1031,7 +1043,7 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
       <audio ref={hitAudioRef} src="/sounds/cathit.wav" preload="auto" />
       <audio ref={yourTurnAudioRef} src="/sounds/yourturn.wav" preload="auto" />
       <audio ref={goblinTurnAudioRef} src="/sounds/goblinturn.wav" preload="auto" />
-      <audio ref={musicAudioRef} src="/sounds/music.mp3" preload="auto" autoPlay />
+      <audio ref={musicAudioRef} src={gameMusicSrc} preload="auto" autoPlay />
       <audio ref={goblinLossAudioRef} src="/sounds/goblinloss.wav" preload="auto" />
       <audio ref={goblinWinAudioRef} src="/sounds/goblinwin.wav" preload="auto" />
       <audio ref={levelUpAudioRef} src="/sounds/levelup.wav" preload="auto" />

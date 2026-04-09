@@ -22,9 +22,11 @@ const SCOREBOARD_CACHE_KEY = 'hathul-scoreboard-cache';
 export default function App() {
   const [gameState, setGameState] = useState<'start' | 'playing'>('start');
   const [musicVolume, setMusicVolume] = useState(() => {
-    if (typeof window === 'undefined') return 0.5;
+    if (typeof window === 'undefined') return 0.4;
     const stored = window.localStorage.getItem('hathul-music-volume');
-    return stored === null ? 0.5 : parseFloat(stored);
+    if (stored === null) return 0.4;
+    const parsed = parseFloat(stored);
+    return Number.isFinite(parsed) ? parsed : 0.4;
   });
   const [showScoreboard, setShowScoreboard] = useState(false);
   const [leaderboardEntries, setLeaderboardEntries] = useState<LeaderboardEntry[]>([]);
@@ -72,6 +74,11 @@ export default function App() {
       loadScoreboard();
     }
   }, [showScoreboard]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('hathul-music-volume', musicVolume.toString());
+  }, [musicVolume]);
 
   if (gameState === 'playing') {
     return <Game onExit={() => setGameState('start')} musicVolume={musicVolume} setMusicVolume={setMusicVolume} />;
