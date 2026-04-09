@@ -339,7 +339,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
           {turn === 'opponent' && <div className="absolute top-0 left-0 w-1 h-full bg-amber-500" />}
           <div className="w-10 h-10 flex items-center justify-center shrink-0">
             <img 
-              src={`https://chiaverano.com/hathul/images/goblins/icon_${level}.png`} 
+              src={`/images/goblins/icon_${level}.png`} 
               alt={currentGoblin.name}
               className="w-full h-full object-contain drop-shadow-md"
               referrerPolicy="no-referrer"
@@ -378,7 +378,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
             <div className="relative">
               <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden flex items-center justify-center">
                 <img 
-                  src={`https://chiaverano.com/hathul/images/cats/cat_${level}.png`} 
+                  src={`/images/cats/cat_${level}.png`} 
                   alt={cat.name}
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
@@ -518,7 +518,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
                   <div className="flex justify-center my-6">
                     <div className="w-32 h-32 rounded-full overflow-hidden flex items-center justify-center border-4 border-red-900/50">
                       <img 
-                        src={`https://chiaverano.com/hathul/images/cats/cat_${level}.png`} 
+                        src={`/images/cats/cat_${level}.png`} 
                         alt={cat.name}
                         className="w-full h-full object-cover grayscale opacity-80"
                         referrerPolicy="no-referrer"

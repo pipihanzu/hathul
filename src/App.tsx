@@ -31,7 +31,7 @@ export default function App() {
             className="w-64 sm:w-96 max-w-full relative drop-shadow-[0_0_40px_rgba(0,0,0,0.5)]"
           >
             <img 
-              src="https://chiaverano.com/hathul/images/elements/splash.png" 
+              src="/images/elements/splash.png" 
               alt="Hathul Splash"
               className="w-full h-auto object-contain"
               referrerPolicy="no-referrer"
