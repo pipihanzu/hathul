@@ -277,9 +277,7 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
     const playMusic = () => {
       if (musicVolume === 0 || !musicAudioRef.current) return;
       musicAudioRef.current.currentTime = 0;
-      musicAudioRef.current.play().catch(() => {
-        // Autoplay may be blocked until user interacts.
-      });
+      musicAudioRef.current.play().catch(() => {});
     };
 
     if (musicVolume > 0) {
@@ -492,12 +490,13 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
   if (!cat) return null;
 
   const currentGoblin = GOBLINS[level - 1];
+  const caveImage = level <= 5 ? `cave${level}` : 'cave5';
 
   return (
     <div className="h-[100dvh] w-full bg-zinc-950 text-zinc-200 font-sans flex flex-col relative overflow-hidden">
       <div
         className="absolute inset-0 bg-center bg-cover pointer-events-none"
-        style={{ backgroundImage: "url('/images/elements/caves/cave1.png')" }}
+        style={{ backgroundImage: `url('/images/elements/caves/${caveImage}.png')` }}
       />
       {/* 3D Dice Overlay */}
       {rollPhase !== 'idle' && (
