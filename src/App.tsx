@@ -112,11 +112,14 @@ export default function App() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="space-y-2"
+            className="space-y-2 flex flex-col items-center"
           >
-            <h1 className="text-6xl sm:text-7xl font-serif font-bold text-transparent bg-clip-text bg-gradient-to-b from-amber-200 via-amber-500 to-amber-700 drop-shadow-sm">
-              Hathul
-            </h1>
+            <img
+              src="/images/elements/hathul.png"
+              alt="Hathul"
+              className="w-64 sm:w-80 h-auto object-contain"
+              referrerPolicy="no-referrer"
+            />
             <p className="text-amber-700/80 font-serif tracking-widest uppercase text-sm sm:text-base">
               A Roll of Fate
             </p>
