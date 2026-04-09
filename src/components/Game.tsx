@@ -125,6 +125,18 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
     setLogs(prev => [...prev, { id: logIdRef.current++, text, type }]);
   };
 
+  const triggerHitHaptic = () => {
+    if (typeof window === 'undefined') return;
+
+    const isMobileDevice = window.matchMedia('(pointer: coarse)').matches || /Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent);
+    if (!isMobileDevice) return;
+
+    if (typeof window.navigator.vibrate === 'function') {
+      // Short double pulse to feel like an impact without being too aggressive.
+      window.navigator.vibrate([22, 35, 28]);
+    }
+  };
+
   const playCatDeathAudio = () => {
     const audioRefs = [
       diceRollAudioRef,
@@ -417,6 +429,7 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
       if (cat) {
         const newHp = Math.max(0, cat.hp - 2);
         setCat({ ...cat, hp: newHp });
+        triggerHitHaptic();
         addLog(`Player used ${potion.name}! Cat takes 2 damage.`, 'info');
         if (newHp <= 0) {
           addLog(`${cat.name} has died!`, 'fatal');
@@ -525,6 +538,7 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
       
       const newHp = Math.max(0, cat.hp - totalDamage);
       setCat({ ...cat, hp: newHp });
+      triggerHitHaptic();
       
       if (dmgBonus > 0) {
         addLog(`Dealt ${totalDamage} damage (${diceDamage} + ${dmgBonus})${isCriticalHit ? ' (Doubled!)' : ''}.`, 'hit');
@@ -849,10 +863,15 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-amber-900/10 via-transparent to-transparent pointer-events-none" />
           
           <motion.div 
-            animate={{ y: [0, -5, 0], rotateX: [2, 3, 2], rotateY: [-1, 1, -1] }}
-            transition={{ repeat: Infinity, duration: 5.2, ease: "easeInOut" }}
+            animate={{ y: [0, -5, 0], rotateX: [2, 3, 2], rotateY: [-1, 1, -1], z: [22, 26, 22] }}
+            whileHover={{
+              x: [0, -6, 4, -9, 7, -3, 0],
+              rotateX: [2, 10, -4, 12, -7, 5, 2],
+              rotateY: [-1, -15, 8, 13, -11, 6, -1],
+            }}
+            transition={{ repeat: Infinity, duration: 5.8, ease: "easeInOut", times: [0, 0.14, 0.29, 0.47, 0.68, 0.86, 1] }}
             className="bg-zinc-900/95 rounded-2xl shadow-2xl p-4 transform-gpu"
-            style={{ transform: 'perspective(1000px) translateZ(24px)', transformStyle: 'preserve-3d' }}
+            style={{ perspective: 1300, transformStyle: 'preserve-3d', transformOrigin: '50% 50%' }}
           >
             <motion.div 
               key={cat.name}
@@ -866,8 +885,10 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
               className="flex flex-col items-center gap-2 sm:gap-3"
             >
               <div className="relative">
-                <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-2xl bg-zinc-900/80 shadow-2xl transform rotate-1 hover:rotate-0 transition-transform duration-300 flex items-center justify-center overflow-hidden">
-                  <img 
+                <div
+                  className="w-32 h-32 sm:w-36 sm:h-36 rounded-2xl bg-zinc-900/80 shadow-2xl transform-gpu rotate-1 transition-transform duration-700 flex items-center justify-center overflow-hidden"
+                >
+                  <img
                     src={`/images/cats/cat_${level}.png`} 
                     alt={cat.name}
                     className="w-full h-full object-cover rounded-2xl"
