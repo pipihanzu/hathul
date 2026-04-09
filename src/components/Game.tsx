@@ -72,15 +72,57 @@ export default function Game({ onExit }: { onExit: () => void }) {
   const missAudioRef = useRef<HTMLAudioElement>(null);
   const hitAudioRef = useRef<HTMLAudioElement>(null);
   const yourTurnAudioRef = useRef<HTMLAudioElement>(null);
+  const goblinTurnAudioRef = useRef<HTMLAudioElement>(null);
+  const musicAudioRef = useRef<HTMLAudioElement>(null);
   const goblinLossAudioRef = useRef<HTMLAudioElement>(null);
   const goblinWinAudioRef = useRef<HTMLAudioElement>(null);
   const levelUpAudioRef = useRef<HTMLAudioElement>(null);
 
+  const [musicEnabled, setMusicEnabled] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    const stored = window.localStorage.getItem('hathul-music-enabled');
+    return stored === null ? true : stored === 'true';
+  });
+
   const [availablePotions, setAvailablePotions] = useState<PotionDef[]>([]);
   const [activePotionEffects, setActivePotionEffects] = useState<PotionEffect[]>([]);
+  const [score, setScore] = useState(0);
+  const [scoreEvents, setScoreEvents] = useState<{ id: number; amount: number; label: string; type: 'gain' | 'bonus' }[]>([]);
+  const scoreEventIdRef = useRef(0);
+  const scoreTimeoutsRef = useRef<Record<number, number>>({});
+
+  const SCORE_BASE_ROLL = 10;
+  const SCORE_CRITICAL_ROLL = 30;
+  const SCORE_MISS_BONUS = 8;
+  const SCORE_LEVEL_PASS = 70;
+  const SCORE_GAME_WIN = 140;
 
   const addLog = (text: string, type: 'info' | 'hit' | 'miss' | 'fatal' = 'info') => {
     setLogs(prev => [...prev, { id: logIdRef.current++, text, type }]);
+  };
+
+  const addScore = (amount: number) => {
+    if (amount === 0) return;
+    setScore(prev => prev + amount);
+  };
+
+  const addScoreEvent = (amount: number, label: string, type: 'gain' | 'bonus' = 'gain') => {
+    if (amount === 0) return;
+    addScore(amount);
+    const id = scoreEventIdRef.current++;
+    setScoreEvents(prev => [{ id, amount, label, type }, ...prev]);
+
+    const timer = window.setTimeout(() => {
+      setScoreEvents(prev => prev.filter(event => event.id !== id));
+      delete scoreTimeoutsRef.current[id];
+    }, 3200);
+
+    scoreTimeoutsRef.current[id] = timer;
+  };
+
+  const awardPlayerRollAttempt = () => {
+    if (turn !== 'player') return;
+    addScore(SCORE_BASE_ROLL);
   };
 
   useEffect(() => {
@@ -88,6 +130,12 @@ export default function Game({ onExit }: { onExit: () => void }) {
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
   }, [logs]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(scoreTimeoutsRef.current).forEach(clearTimeout);
+    };
+  }, []);
 
   const startLevel = (lvl: number) => {
     const newCat: CatEntity = {
@@ -119,9 +167,19 @@ export default function Game({ onExit }: { onExit: () => void }) {
     
     const firstTurn = Math.random() > 0.5 ? 'player' : 'opponent';
     setTurn(firstTurn);
-    
+
     addLog(`Level ${lvl}: A wild ${newCat.name} appears!`, 'info');
     addLog(`${firstTurn === 'player' ? 'Player goes' : GOBLINS[lvl - 1].name + ' goes'} first.`, 'info');
+
+    if (firstTurn === 'player' && yourTurnAudioRef.current) {
+      yourTurnAudioRef.current.currentTime = 0;
+      yourTurnAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
+    }
+
+    if (firstTurn === 'opponent' && goblinTurnAudioRef.current) {
+      goblinTurnAudioRef.current.currentTime = 0;
+      goblinTurnAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
+    }
   };
 
   // Initialize first level
@@ -133,6 +191,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
     if (gameState !== 'playing' || !cat) return;
     
     if (rollPhase === 'idle') {
+      if (turn === 'player') awardPlayerRollAttempt();
       setRollPhase('d20');
       setRollResult(null);
       setDamageResult(null);
@@ -152,6 +211,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
         setRollResult(d20);
       }, 1750);
     } else if (rollPhase === 'waiting-d6' && turn === 'player') {
+      awardPlayerRollAttempt();
       setRollPhase('d6');
       setRollResult(null);
       
@@ -189,13 +249,60 @@ export default function Game({ onExit }: { onExit: () => void }) {
     }
   }, [turn, gameState, rollPhase, cat]);
 
-  // Play sound when player's turn starts
+  // Play sound when a turn begins
   useEffect(() => {
-    if (turn === 'player' && gameState === 'playing' && yourTurnAudioRef.current) {
+    if (gameState !== 'playing') return;
+
+    if (turn === 'player' && yourTurnAudioRef.current) {
       yourTurnAudioRef.current.currentTime = 0;
       yourTurnAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
     }
+
+    if (turn === 'opponent' && goblinTurnAudioRef.current) {
+      goblinTurnAudioRef.current.currentTime = 0;
+      goblinTurnAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
+    }
   }, [turn, gameState]);
+
+  useEffect(() => {
+    if (!musicAudioRef.current) return;
+    musicAudioRef.current.loop = true;
+    musicAudioRef.current.volume = 0.35;
+
+    const playMusic = () => {
+      if (!musicEnabled || !musicAudioRef.current) return;
+      musicAudioRef.current.currentTime = 0;
+      musicAudioRef.current.play().catch(() => {
+        // Autoplay may be blocked until user interacts.
+      });
+    };
+
+    if (musicEnabled) {
+      playMusic();
+    } else {
+      musicAudioRef.current.pause();
+    }
+
+    const onUserInteraction = () => {
+      if (musicEnabled && musicAudioRef.current && musicAudioRef.current.paused) {
+        musicAudioRef.current.play().catch(() => {});
+      }
+      window.removeEventListener('pointerdown', onUserInteraction);
+      window.removeEventListener('keydown', onUserInteraction);
+    };
+
+    window.addEventListener('pointerdown', onUserInteraction, { once: true });
+    window.addEventListener('keydown', onUserInteraction, { once: true });
+
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('hathul-music-enabled', musicEnabled.toString());
+    }
+
+    return () => {
+      window.removeEventListener('pointerdown', onUserInteraction);
+      window.removeEventListener('keydown', onUserInteraction);
+    };
+  }, [musicEnabled]);
 
   const usePotion = (potion: PotionDef) => {
     if (turn !== 'player' || rollPhase !== 'idle' || gameState !== 'playing') return;
@@ -244,16 +351,21 @@ export default function Game({ onExit }: { onExit: () => void }) {
     }
     
     if (rollPhase === 'd20') {
-      const isCrit = rollResult === 20;
+      const isCriticalRoll = rollResult === 20 || rollResult === 1;
+      const isCriticalHit = rollResult === 20;
       const totalAtk = rollResult + atkBonus;
-      const hit = totalAtk >= effectiveAc || isCrit; // 20 always hits
-      setIsCriticalHit(isCrit);
+      const hit = totalAtk >= effectiveAc || isCriticalHit; // 20 always hits
+      setIsCriticalHit(isCriticalHit);
       
       if (atkBonus !== 0) {
         const sign = atkBonus > 0 ? '+' : '-';
-        addLog(`${attackerName} rolls ${rollResult} ${sign} ${Math.abs(atkBonus)} = ${totalAtk}${isCrit ? ' (CRIT!)' : ''}`, 'info');
+        addLog(`${attackerName} rolls ${rollResult} ${sign} ${Math.abs(atkBonus)} = ${totalAtk}${isCriticalRoll ? ' (CRIT!)' : ''}`, 'info');
       } else {
-        addLog(`${attackerName} rolls ${rollResult}${isCrit ? ' (CRIT!)' : ''}`, 'info');
+        addLog(`${attackerName} rolls ${rollResult}${isCriticalRoll ? ' (CRIT!)' : ''}`, 'info');
+      }
+
+      if (turn === 'player' && isCriticalRoll) {
+        addScoreEvent(SCORE_CRITICAL_ROLL, `${rollResult === 20 ? 'Critical Hit' : 'Critical Roll'} +${SCORE_CRITICAL_ROLL}`, 'bonus');
       }
 
       if (hit) {
@@ -283,6 +395,9 @@ export default function Game({ onExit }: { onExit: () => void }) {
         }
       } else {
         addLog(`Miss!`, 'miss');
+        if (turn === 'player') {
+          addScoreEvent(SCORE_MISS_BONUS, `Miss Bonus +${SCORE_MISS_BONUS}`, 'bonus');
+        }
         
         // Play miss sound
         if (missAudioRef.current) {
@@ -335,7 +450,9 @@ export default function Game({ onExit }: { onExit: () => void }) {
               goblinLossAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
             }
             addLog(`${attackerName} killed ${cat.name}. You survive!`, 'info');
+            addScoreEvent(SCORE_LEVEL_PASS, `Level Clear +${SCORE_LEVEL_PASS}`, 'bonus');
             if (level === 9) {
+              addScoreEvent(SCORE_GAME_WIN, `Victory Bonus +${SCORE_GAME_WIN}`, 'bonus');
               setGameState('gameWon');
             } else {
               setGameState('levelComplete');
@@ -380,11 +497,45 @@ export default function Game({ onExit }: { onExit: () => void }) {
       )}
 
       {/* Header */}
-      <header className="shrink-0 p-2 px-4 border-b border-zinc-900 flex justify-between items-center bg-zinc-950/80 backdrop-blur z-10">
-        <div className="font-serif text-lg text-amber-500">Hathul</div>
-        <div className="text-zinc-500 text-xs">Level {level} / 9</div>
-        <button onClick={onExit} className="text-zinc-500 hover:text-zinc-300 text-xs">Flee</button>
+      <header className="shrink-0 p-2 px-4 border-b border-zinc-900 flex flex-wrap justify-between items-center gap-2 bg-zinc-950/80 backdrop-blur z-10">
+        <div className="flex items-center gap-4">
+          <div className="font-serif text-lg text-amber-500">Hathul</div>
+          <div className="text-zinc-500 text-xs">Level {level} / 9</div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="text-amber-200 text-sm font-semibold">Score: {score}</div>
+          <button
+            onClick={() => setMusicEnabled(prev => !prev)}
+            className={cn(
+              'text-xs px-3 py-1 rounded-full border transition-colors',
+              musicEnabled ? 'border-amber-500 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20' : 'border-zinc-600 bg-zinc-900 text-zinc-400 hover:bg-zinc-800'
+            )}
+          >
+            {musicEnabled ? 'Music On' : 'Music Off'}
+          </button>
+          <button onClick={onExit} className="text-zinc-500 hover:text-zinc-300 text-xs">Flee</button>
+        </div>
       </header>
+
+      <div className="absolute top-[84px] right-4 z-40 flex flex-col items-end gap-2 pointer-events-none">
+        <AnimatePresence>
+          {scoreEvents.map((event) => (
+            <motion.div
+              key={event.id}
+              initial={{ opacity: 0, y: 18, x: 10, scale: 0.96 }}
+              animate={{ opacity: 1, y: -2, x: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -24, x: 6, scale: 0.96 }}
+              transition={{ duration: 0.28, ease: 'easeOut' }}
+              className={cn(
+                'rounded-full px-4 py-2 text-sm font-semibold shadow-2xl text-white backdrop-blur-sm',
+                event.type === 'bonus' ? 'bg-sky-500/95' : 'bg-amber-500/95'
+              )}
+            >
+              +{event.amount} {event.label}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
 
       {/* Battlefield */}
       <main className="flex-1 min-h-0 flex flex-col p-2 gap-2 sm:gap-4 max-w-2xl mx-auto w-full z-10">
@@ -619,6 +770,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
       <audio ref={missAudioRef} src="/sounds/miss.wav" preload="auto" />
       <audio ref={hitAudioRef} src="/sounds/cathit.wav" preload="auto" />
       <audio ref={yourTurnAudioRef} src="/sounds/yourturn.wav" preload="auto" />
+      <audio ref={goblinTurnAudioRef} src="/sounds/goblinturn.wav" preload="auto" />
+      <audio ref={musicAudioRef} src="/sounds/music.mp3" preload="auto" autoPlay />
       <audio ref={goblinLossAudioRef} src="/sounds/goblinloss.wav" preload="auto" />
       <audio ref={goblinWinAudioRef} src="/sounds/goblinwin.wav" preload="auto" />
       <audio ref={levelUpAudioRef} src="/sounds/levelup.wav" preload="auto" />

@@ -153,7 +153,7 @@ const GameDice: React.FC<DiceProps> = ({ rolling, result, roller, type = 'd20', 
 
   return (
     <Float speed={rolling ? 0 : 2} rotationIntensity={rolling ? 0 : 0.5} floatIntensity={rolling ? 0 : 0.5}>
-      <mesh ref={meshRef} geometry={geometry} castShadow receiveShadow>
+      <mesh ref={meshRef} geometry={geometry} scale={[0.5, 0.5, 0.5]} castShadow receiveShadow>
         <meshStandardMaterial 
           color={diceColor}
           roughness={0.2}
@@ -194,8 +194,8 @@ const GameDice: React.FC<DiceProps> = ({ rolling, result, roller, type = 'd20', 
 export default function Dice3D({ rolling, result, roller, type = 'd20', onRollComplete }: DiceProps) {
   return (
     <div className="absolute inset-0 pointer-events-none z-50 flex items-center justify-center">
-      <div className="w-full max-w-xs aspect-square pointer-events-none">
-        <Canvas camera={{ position: [0, 0, 6], fov: 45 }} style={{ pointerEvents: 'none' }}>
+      <div className="w-full max-w-full h-full pointer-events-none">
+        <Canvas camera={{ position: [0, 0, 6], fov: 45 }} style={{ pointerEvents: 'none', width: '100%', height: '100%' }}>
           <Suspense fallback={null}>
             <ambientLight intensity={0.8} />
             <directionalLight position={[10, 10, 10]} intensity={2} castShadow />
