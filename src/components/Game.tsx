@@ -364,6 +364,10 @@ export default function Game({ onExit }: { onExit: () => void }) {
 
   return (
     <div className="h-[100dvh] w-full bg-zinc-950 text-zinc-200 font-sans flex flex-col relative overflow-hidden">
+      <div
+        className="absolute inset-0 bg-center bg-cover pointer-events-none"
+        style={{ backgroundImage: "url('/images/elements/caves/cave1.png')" }}
+      />
       {/* 3D Dice Overlay */}
       {rollPhase !== 'idle' && (
         <Dice3D 
@@ -387,22 +391,22 @@ export default function Game({ onExit }: { onExit: () => void }) {
         
         {/* Opponent Area */}
         <div className={cn(
-          "shrink-0 p-2 sm:p-3 rounded-lg border transition-all duration-500 flex items-center gap-3 relative overflow-hidden",
-          turn === 'opponent' ? "border-amber-500 bg-amber-950/30 shadow-[0_0_15px_rgba(245,158,11,0.2)] scale-[1.02]" : "border-zinc-800 bg-zinc-900/50 opacity-60"
+          "shrink-0 p-3 sm:p-4 rounded-2xl border-2 transition-all duration-500 flex items-center gap-4 relative overflow-hidden min-h-[110px]",
+          turn === 'opponent' ? "border-amber-400 bg-amber-950/40 shadow-[0_0_30px_rgba(245,158,11,0.25)] scale-[1.01]" : "border-zinc-700 bg-zinc-900/70"
         )}>
-          {turn === 'opponent' && <div className="absolute top-0 left-0 w-1 h-full bg-amber-500" />}
-          <div className="w-10 h-10 flex items-center justify-center shrink-0">
+          {turn === 'opponent' && <div className="absolute top-0 left-0 w-1.5 h-full bg-amber-400" />}
+          <div className="w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center shrink-0">
             <img 
               src={`/images/goblins/icon_${level}.png`} 
               alt={currentGoblin.name}
-              className="w-full h-full object-contain drop-shadow-md"
+              className="w-full h-full object-contain drop-shadow-lg"
               referrerPolicy="no-referrer"
             />
           </div>
           <div className="flex-1">
-            <div className="flex justify-between items-center mb-0.5">
-              <h3 className="font-serif text-base text-zinc-300">{currentGoblin.name}</h3>
-              {turn === 'opponent' && <span className="text-[10px] font-bold text-amber-500 animate-pulse">ACTIVE TURN</span>}
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 mb-1">
+              <h3 className="font-serif text-lg sm:text-xl text-zinc-100">{currentGoblin.name}</h3>
+              {turn === 'opponent' && <span className="text-xs sm:text-sm font-bold text-amber-300 animate-pulse">ACTIVE TURN</span>}
             </div>
             {(currentGoblin.atkBonus || currentGoblin.dmgBonus || currentGoblin.weapon) && (
               <div className="text-xs text-zinc-400 font-mono">
