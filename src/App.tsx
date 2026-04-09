@@ -22,11 +22,11 @@ const SCOREBOARD_CACHE_KEY = 'hathul-scoreboard-cache';
 export default function App() {
   const [gameState, setGameState] = useState<'start' | 'playing'>('start');
   const [musicVolume, setMusicVolume] = useState(() => {
-    if (typeof window === 'undefined') return 0.4;
+    if (typeof window === 'undefined') return 0.2;
     const stored = window.localStorage.getItem('hathul-music-volume');
-    if (stored === null) return 0.4;
+    if (stored === null) return 0.2;
     const parsed = parseFloat(stored);
-    return Number.isFinite(parsed) ? parsed : 0.4;
+    return Number.isFinite(parsed) ? parsed : 0.2;
   });
   const [showScoreboard, setShowScoreboard] = useState(false);
   const [leaderboardEntries, setLeaderboardEntries] = useState<LeaderboardEntry[]>([]);

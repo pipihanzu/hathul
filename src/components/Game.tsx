@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Shield, Heart, Sword, Skull, Cat, ArrowRight } from 'lucide-react';
+import { Shield, Heart, Sword, Skull, Cat, ArrowRight, Volume2, VolumeX } from 'lucide-react';
 import Dice3D from './Dice3D';
 import { cn } from '../lib/utils';
 
@@ -85,6 +85,10 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
     return stored === null ? true : stored === 'true';
   });
   const [showVolumeModal, setShowVolumeModal] = useState(false);
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressTriggeredRef = useRef(false);
+  // Volume before muting, so we can restore it on unmute
+  const preMuteVolumeRef = useRef(musicVolume);
 
   const [availablePotions, setAvailablePotions] = useState<PotionDef[]>([]);
   const [activePotionEffects, setActivePotionEffects] = useState<PotionEffect[]>([]);
@@ -319,42 +323,42 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
     }
   }, [turn, gameState]);
 
-  useEffect(() => {
+  // Runs synchronously on mount, still within the user-gesture context of the
+  // "Start Game" click, so the browser allows play() without autoplay policy blocking.
+  useLayoutEffect(() => {
     if (!musicAudioRef.current) return;
     musicAudioRef.current.loop = true;
-    // Non-linear volume curve: 50% stays at 0.15, 100% reaches 0.5
-    const volumeMultiplier = musicVolume <= 0.5 
-      ? musicVolume * 0.3 
+    const vol = musicVolume <= 0.5
+      ? musicVolume * 0.3
       : 0.15 + (musicVolume - 0.5) * 0.7;
-    musicAudioRef.current.volume = volumeMultiplier;
-
-    const playMusic = () => {
-      if (musicVolume === 0 || !musicAudioRef.current) return;
-      musicAudioRef.current.currentTime = 0;
-      musicAudioRef.current.play().catch(() => {});
-    };
-
+    musicAudioRef.current.volume = vol;
     if (musicVolume > 0) {
-      playMusic();
-    } else {
-      musicAudioRef.current.pause();
+      musicAudioRef.current.play().catch(() => {
+        // Autoplay blocked — try again on first user interaction
+        const onUserInteraction = () => {
+          if (musicVolume > 0 && musicAudioRef.current && musicAudioRef.current.paused) {
+            musicAudioRef.current.play().catch(() => {});
+          }
+        };
+        window.addEventListener('pointerdown', onUserInteraction, { once: true });
+        window.addEventListener('keydown', onUserInteraction, { once: true });
+      });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    const onUserInteraction = () => {
-      if (musicVolume > 0 && musicAudioRef.current && musicAudioRef.current.paused) {
-        musicAudioRef.current.play().catch(() => {});
-      }
-      window.removeEventListener('pointerdown', onUserInteraction);
-      window.removeEventListener('keydown', onUserInteraction);
-    };
-
-    window.addEventListener('pointerdown', onUserInteraction, { once: true });
-    window.addEventListener('keydown', onUserInteraction, { once: true });
-
-    return () => {
-      window.removeEventListener('pointerdown', onUserInteraction);
-      window.removeEventListener('keydown', onUserInteraction);
-    };
+  // Only update volume (and pause/resume) when musicVolume changes after mount.
+  useEffect(() => {
+    if (!musicAudioRef.current) return;
+    const vol = musicVolume <= 0.5
+      ? musicVolume * 0.3
+      : 0.15 + (musicVolume - 0.5) * 0.7;
+    musicAudioRef.current.volume = vol;
+    if (musicVolume === 0) {
+      musicAudioRef.current.pause();
+    } else if (musicAudioRef.current.paused) {
+      musicAudioRef.current.play().catch(() => {});
+    }
   }, [musicVolume]);
 
   useEffect(() => {
@@ -703,10 +707,43 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
         <div className="flex items-center gap-3">
           <div ref={scoreTargetRef} className="text-amber-200 text-sm font-semibold">Score: {score}</div>
           <button
-            onClick={() => setShowVolumeModal(true)}
-            className="text-xs px-3 py-1 rounded-full border border-amber-500 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 transition-colors"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              longPressTriggeredRef.current = false;
+              longPressTimerRef.current = window.setTimeout(() => {
+                longPressTriggeredRef.current = true;
+                setShowVolumeModal(true);
+              }, 500);
+            }}
+            onPointerUp={() => {
+              if (longPressTimerRef.current !== null) {
+                clearTimeout(longPressTimerRef.current);
+                longPressTimerRef.current = null;
+              }
+              if (!longPressTriggeredRef.current) {
+                // Short tap: toggle on/off
+                if (musicVolume > 0) {
+                  preMuteVolumeRef.current = musicVolume;
+                  setMusicVolume(0);
+                  setMusicEnabled(false);
+                } else {
+                  const restore = preMuteVolumeRef.current > 0 ? preMuteVolumeRef.current : 0.2;
+                  setMusicVolume(restore);
+                  setMusicEnabled(true);
+                }
+              }
+            }}
+            onPointerLeave={() => {
+              if (longPressTimerRef.current !== null) {
+                clearTimeout(longPressTimerRef.current);
+                longPressTimerRef.current = null;
+              }
+            }}
+            className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border border-amber-500 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 transition-colors select-none touch-none"
+            title="Tap to toggle music · Hold to adjust volume"
           >
-            Music {Math.round(musicVolume * 100)}%
+            {musicVolume > 0 ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5 opacity-60" />}
+            <span className={musicVolume === 0 ? 'opacity-40' : ''}>{Math.round(musicVolume * 100)}%</span>
           </button>
           <button onClick={onExit} className="text-zinc-500 hover:text-zinc-300 text-xs">Flee</button>
         </div>
@@ -1043,7 +1080,7 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
       <audio ref={hitAudioRef} src="/sounds/cathit.wav" preload="auto" />
       <audio ref={yourTurnAudioRef} src="/sounds/yourturn.wav" preload="auto" />
       <audio ref={goblinTurnAudioRef} src="/sounds/goblinturn.wav" preload="auto" />
-      <audio ref={musicAudioRef} src={gameMusicSrc} preload="auto" autoPlay />
+      <audio ref={musicAudioRef} src={gameMusicSrc} preload="auto" />
       <audio ref={goblinLossAudioRef} src="/sounds/goblinloss.wav" preload="auto" />
       <audio ref={goblinWinAudioRef} src="/sounds/goblinwin.wav" preload="auto" />
       <audio ref={levelUpAudioRef} src="/sounds/levelup.wav" preload="auto" />

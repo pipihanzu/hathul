@@ -1,5 +1,12 @@
 [
   {
+    "id": "entry_1775767842247_hwfx12",
+    "name": "jin",
+    "score": 266,
+    "level": 3,
+    "createdAt": "2026-04-09T20:50:42.247Z"
+  },
+  {
     "id": "entry_1775766606193_eudbtq",
     "name": "zolfan",
     "score": 202,
@@ -12,6 +19,13 @@
     "score": 130,
     "level": 2,
     "createdAt": "2026-04-09T20:34:23.211Z"
+  },
+  {
+    "id": "entry_1775767532893_ijs1yg",
+    "name": "Loz",
+    "score": 58,
+    "level": 1,
+    "createdAt": "2026-04-09T20:45:32.893Z"
   },
   {
     "id": "entry_1775761757541_p9asap",
