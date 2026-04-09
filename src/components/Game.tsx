@@ -76,7 +76,7 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
   const musicAudioRef = useRef<HTMLAudioElement>(null);
   const goblinLossAudioRef = useRef<HTMLAudioElement>(null);
   const goblinWinAudioRef = useRef<HTMLAudioElement>(null);
-  const levelUpAudioRef = useRef<HTMLAudioElement>(null);
+  const catDieAudioRef = useRef<HTMLAudioElement>(null);
   const drinkAudioRef = useRef<HTMLAudioElement>(null);
 
   const [musicEnabled, setMusicEnabled] = useState(() => {
@@ -123,6 +123,31 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
 
   const addLog = (text: string, type: 'info' | 'hit' | 'miss' | 'fatal' = 'info') => {
     setLogs(prev => [...prev, { id: logIdRef.current++, text, type }]);
+  };
+
+  const playCatDeathAudio = () => {
+    const audioRefs = [
+      diceRollAudioRef,
+      missAudioRef,
+      hitAudioRef,
+      yourTurnAudioRef,
+      goblinTurnAudioRef,
+      musicAudioRef,
+      goblinLossAudioRef,
+      goblinWinAudioRef,
+      drinkAudioRef,
+      catDieAudioRef,
+    ];
+
+    for (const ref of audioRefs) {
+      if (!ref.current) continue;
+      ref.current.pause();
+      ref.current.currentTime = 0;
+    }
+
+    if (catDieAudioRef.current) {
+      catDieAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
+    }
   };
 
   const addScore = (amount: number) => {
@@ -214,11 +239,6 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
     hasCheckedLeaderboardRef.current = false;
     
     setGameMusicSrc(getRandomTrack());
-    
-    if (lvl > 1 && levelUpAudioRef.current) {
-      levelUpAudioRef.current.currentTime = 0;
-      levelUpAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
-    }
     
     const numPotions = Math.min(6, lvl + 1);
     setAvailablePotions(POTIONS_DB.slice(0, numPotions));
@@ -400,6 +420,7 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
         addLog(`Player used ${potion.name}! Cat takes 2 damage.`, 'info');
         if (newHp <= 0) {
           addLog(`${cat.name} has died!`, 'fatal');
+          playCatDeathAudio();
           setIsWaitingForNextTurn(true);
           setTimeout(() => {
             setGameState('gameOver');
@@ -513,6 +534,7 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
 
       if (newHp <= 0) {
         addLog(`${cat.name} has died!`, 'fatal');
+        playCatDeathAudio();
         
         setIsWaitingForNextTurn(true);
         setTimeout(() => {
@@ -1083,7 +1105,7 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
       <audio ref={musicAudioRef} src={gameMusicSrc} preload="auto" />
       <audio ref={goblinLossAudioRef} src="/sounds/goblinloss.wav" preload="auto" />
       <audio ref={goblinWinAudioRef} src="/sounds/goblinwin.wav" preload="auto" />
-      <audio ref={levelUpAudioRef} src="/sounds/levelup.wav" preload="auto" />
+      <audio ref={catDieAudioRef} src="/sounds/catdie.wav" preload="auto" />
       <audio ref={drinkAudioRef} src="/sounds/drink.wav" preload="auto" />
     </div>
   );
