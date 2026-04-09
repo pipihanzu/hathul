@@ -23,12 +23,12 @@ type PotionDef = {
 };
 
 const POTIONS_DB: PotionDef[] = [
-  { id: 'whiskey', name: 'Whiskey', desc: '-3 to your roll', effect: 'roll_minus_3', icon: '🥃', color: 'bg-orange-900/50 text-orange-500' },
-  { id: 'heal', name: 'Heal Other', desc: '+2 HP to Cat', effect: 'heal_cat_2', icon: '🧪', color: 'bg-green-900/50 text-green-500' },
-  { id: 'focus', name: 'Focus', desc: '+3 to your roll', effect: 'roll_plus_3', icon: '👁️', color: 'bg-blue-900/50 text-blue-500' },
-  { id: 'shield', name: 'Cat Shield', desc: '+2 Cat AC', effect: 'cat_ac_plus_2', icon: '🛡️', color: 'bg-indigo-900/50 text-indigo-500' },
-  { id: 'vuln', name: 'Cat Vuln', desc: '-2 Cat AC', effect: 'cat_ac_minus_2', icon: '🎯', color: 'bg-red-900/50 text-red-500' },
-  { id: 'poison', name: 'Poison', desc: '-2 HP to Cat', effect: 'damage_cat_2', icon: '☠️', color: 'bg-purple-900/50 text-purple-500' },
+  { id: 'whiskey', name: 'Whiskey', desc: '-3 to your roll', effect: 'roll_minus_3', icon: '/images/elements/items/whiskey.png', color: 'bg-orange-900/50 text-orange-500' },
+  { id: 'heal', name: 'Heal Other', desc: '+2 HP to Cat', effect: 'heal_cat_2', icon: '/images/elements/items/heal.png', color: 'bg-green-900/50 text-green-500' },
+  { id: 'focus', name: 'Focus', desc: '+3 to your roll', effect: 'roll_plus_3', icon: '/images/elements/items/pill.png', color: 'bg-blue-900/50 text-blue-500' },
+  { id: 'shield', name: 'Cat Shield', desc: '+2 Cat AC', effect: 'cat_ac_plus_2', icon: '/images/elements/items/catshield.png', color: 'bg-indigo-900/50 text-indigo-500' },
+  { id: 'vuln', name: 'Cat Vuln', desc: '-2 Cat AC', effect: 'cat_ac_minus_2', icon: '/images/elements/items/catnip.png', color: 'bg-red-900/50 text-red-500' },
+  { id: 'poison', name: 'Poison', desc: '-2 HP to Cat', effect: 'damage_cat_2', icon: '/images/elements/items/skull.png', color: 'bg-purple-900/50 text-purple-500' },
 ];
 
 type Goblin = {
@@ -77,6 +77,7 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
   const goblinLossAudioRef = useRef<HTMLAudioElement>(null);
   const goblinWinAudioRef = useRef<HTMLAudioElement>(null);
   const levelUpAudioRef = useRef<HTMLAudioElement>(null);
+  const drinkAudioRef = useRef<HTMLAudioElement>(null);
 
   const [musicEnabled, setMusicEnabled] = useState(() => {
     if (typeof window === 'undefined') return true;
@@ -350,6 +351,11 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
 
   const usePotion = (potion: PotionDef) => {
     if (turn !== 'player' || rollPhase !== 'idle' || gameState !== 'playing') return;
+
+    if (drinkAudioRef.current) {
+      drinkAudioRef.current.currentTime = 0;
+      drinkAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
+    }
     
     setAvailablePotions(prev => prev.filter(p => p.id !== potion.id));
     
@@ -805,30 +811,30 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
         {/* Player Area Container */}
         <div className="flex flex-col gap-2 shrink-0 w-full mx-auto">
           {/* Potions Bar */}
-          <div className="grid grid-cols-6 gap-1 h-12 bg-zinc-900/80 p-1 rounded-lg border border-zinc-800">
-            {Array.from({ length: 6 }).map((_, i) => {
-              const potion = availablePotions[i];
-              return (
-                <div key={i} className="w-full h-full rounded bg-zinc-950 flex items-center justify-center relative overflow-hidden">
-                  {potion ? (
-                    <button
-                      onClick={() => usePotion(potion)}
-                      disabled={turn !== 'player' || rollPhase !== 'idle' || gameState !== 'playing'}
-                      className={cn(
-                        "w-full h-full flex items-center justify-center text-lg transition-all",
-                        potion.color,
-                        (turn === 'player' && rollPhase === 'idle' && gameState === 'playing') ? "hover:brightness-125 cursor-pointer active:scale-95" : "opacity-50 cursor-not-allowed"
-                      )}
-                      title={`${potion.name}: ${potion.desc}`}
-                    >
-                      {potion.icon}
-                    </button>
-                  ) : (
-                    <div className="w-full h-full border border-dashed border-zinc-800/50 rounded" />
+          <div className="grid grid-cols-5 gap-2 bg-zinc-900/80 p-2 rounded-lg border border-zinc-800">
+            {availablePotions.map((potion) => (
+              <div key={potion.id} className="w-full h-20 sm:h-24 rounded flex items-center justify-center relative overflow-hidden">
+                <button
+                  onClick={() => usePotion(potion)}
+                  disabled={turn !== 'player' || rollPhase !== 'idle' || gameState !== 'playing'}
+                  className={cn(
+                    "w-full h-full flex flex-col items-center justify-center gap-1 px-1 transition-all bg-transparent",
+                    (turn === 'player' && rollPhase === 'idle' && gameState === 'playing') ? "hover:brightness-125 cursor-pointer active:scale-95" : "opacity-50 cursor-not-allowed"
                   )}
-                </div>
-              );
-            })}
+                  title={`${potion.name}: ${potion.desc}`}
+                >
+                  <img
+                    src={potion.icon}
+                    alt={potion.name}
+                    className="w-10 h-10 object-contain scale-[1.7]"
+                    referrerPolicy="no-referrer"
+                  />
+                  <span className="mt-3 text-[9px] sm:text-[10px] leading-tight text-zinc-300 text-center whitespace-normal break-words">
+                    {potion.desc}
+                  </span>
+                </button>
+              </div>
+            ))}
           </div>
 
           {/* Player Box */}
@@ -990,6 +996,7 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
       <audio ref={goblinLossAudioRef} src="/sounds/goblinloss.wav" preload="auto" />
       <audio ref={goblinWinAudioRef} src="/sounds/goblinwin.wav" preload="auto" />
       <audio ref={levelUpAudioRef} src="/sounds/levelup.wav" preload="auto" />
+      <audio ref={drinkAudioRef} src="/sounds/drink.wav" preload="auto" />
     </div>
   );
 }
