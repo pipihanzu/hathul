@@ -1055,12 +1055,12 @@ export default function Game({
           
           <div
             className={cn(
-              "bg-zinc-900/95 rounded-2xl shadow-2xl p-4 transform-gpu",
+              "bg-zinc-900/95 rounded-2xl shadow-2xl p-2.5 sm:p-4 transform-gpu",
               isCatHitShaking && 'cat-hit-shake'
             )}
             style={{ perspective: 1200, transformStyle: 'preserve-3d', transformOrigin: '50% 50%' }}
           >
-            <div className="cat-card-flip-shell w-[14rem] sm:w-[15.5rem] h-[20rem] sm:h-[22rem]">
+            <div className="cat-card-flip-shell w-[clamp(10.5rem,48vw,14rem)] sm:w-[15.5rem] h-[clamp(14.75rem,69vw,20rem)] sm:h-[22rem]">
               <div
                 className="cat-card-flip-inner"
                 style={{ transform: isCatDead ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
@@ -1069,7 +1069,7 @@ export default function Game({
                   <div className="flex flex-col items-center gap-2 sm:gap-3 h-full justify-center">
                     <div className="relative">
                       <div
-                        className="w-32 h-32 sm:w-36 sm:h-36 rounded-2xl bg-zinc-900/80 shadow-2xl transform-gpu rotate-1 transition-transform duration-700 flex items-center justify-center overflow-hidden"
+                        className="w-[5.75rem] h-[5.75rem] min-[380px]:w-[6.5rem] min-[380px]:h-[6.5rem] sm:w-36 sm:h-36 rounded-2xl bg-zinc-900/80 shadow-2xl transform-gpu rotate-1 transition-transform duration-700 flex items-center justify-center overflow-hidden"
                       >
                         <img
                           src={`/images/cats/cat_${level}.png`} 
@@ -1104,7 +1104,7 @@ export default function Game({
                     </div>
 
                     <div className="text-center space-y-1 sm:space-y-2">
-                      <h2 className="text-xl font-serif text-amber-100">{cat.name}</h2>
+                      <h2 className="text-base min-[380px]:text-lg sm:text-xl font-serif text-amber-100">{cat.name}</h2>
                       <div className="flex items-center justify-center gap-3 text-xs">
                         <div className="flex items-center gap-1 text-red-400" title="Health Points">
                           <Heart className="w-3 h-3" />
@@ -1116,7 +1116,7 @@ export default function Game({
                         </div>
                       </div>
                       {/* Health Bar */}
-                      <div className="w-36 sm:w-40 h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-1 mx-auto">
+                      <div className="w-28 min-[380px]:w-32 sm:w-40 h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-1 mx-auto">
                         <motion.div 
                           className="h-full bg-red-500"
                           initial={{ width: '100%' }}
@@ -1133,7 +1133,7 @@ export default function Game({
                       <img
                         src="/images/elements/items/skull.png"
                         alt="skull"
-                        className="w-32 h-32 sm:w-40 sm:h-40 object-contain"
+                        className="w-[5.75rem] h-[5.75rem] min-[380px]:w-[6.5rem] min-[380px]:h-[6.5rem] sm:w-40 sm:h-40 object-contain"
                         referrerPolicy="no-referrer"
                       />
                     </div>
