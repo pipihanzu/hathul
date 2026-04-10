@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Shield, Heart, Sword, Skull, ArrowRight, Volume2, VolumeX } from 'lucide-react';
+import { Shield, Sword, Skull, ArrowRight, Volume2, VolumeX } from 'lucide-react';
 import Dice3D from './Dice3D';
 import { cn } from '../lib/utils';
 
@@ -1055,81 +1055,79 @@ export default function Game({
           
           <div
             className={cn(
-              "cat-card-mobile-fit bg-zinc-900/95 rounded-2xl shadow-2xl p-2 sm:p-4 transform-gpu",
+              "cat-card-mobile-fit p-1.5 sm:p-3 transform-gpu",
               isCatHitShaking && 'cat-hit-shake'
             )}
             style={{ perspective: 1200, transformStyle: 'preserve-3d', transformOrigin: '50% 50%' }}
           >
-            <div className="cat-card-flip-shell w-[clamp(9.25rem,39vw,11.75rem)] sm:w-[15.5rem] h-[clamp(12.75rem,35dvh,16.75rem)] sm:h-[22rem]">
+            <div className="cat-card-flip-shell w-[clamp(10rem,41vw,12.4rem)] sm:w-[16rem] h-[clamp(13.9rem,37dvh,17.7rem)] sm:h-[22.1rem] overflow-hidden rounded-[0.8rem]">
               <div
                 className="cat-card-flip-inner"
                 style={{ transform: isCatDead ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
               >
                 <div className="cat-card-face cat-card-face-front">
-                  <div className="flex flex-col items-center gap-2 sm:gap-3 h-full justify-center">
-                    <div className="relative">
-                      <div
-                        className="w-[4.75rem] h-[4.75rem] min-[380px]:w-[5.5rem] min-[380px]:h-[5.5rem] sm:w-36 sm:h-36 rounded-2xl bg-zinc-900/80 shadow-2xl transform-gpu rotate-1 transition-transform duration-700 flex items-center justify-center overflow-hidden"
-                      >
-                        <img
-                          src={`/images/cats/cat_${level}.png`} 
-                          alt={cat.name}
-                          className="w-full h-full object-cover rounded-2xl"
-                          referrerPolicy="no-referrer"
-                        />
+                  <div className="cat-card-front-surface h-full w-full p-2 sm:p-3">
+                    <div className="cat-card-front-frame relative flex h-full flex-col items-center justify-between gap-2 px-2 py-3 sm:gap-3 sm:px-3 sm:py-4">
+                      <div className="absolute right-2 top-2 sm:right-3 sm:top-3 flex items-center justify-center" title="Armor Class">
+                        <div className="relative flex h-11 w-10 min-[380px]:h-12 min-[380px]:w-11 sm:h-14 sm:w-12 items-center justify-center">
+                          <Shield className="absolute inset-0 h-full w-full fill-amber-300/20 text-amber-500" strokeWidth={1.8} />
+                          <span className="relative pt-0.5 text-sm min-[380px]:text-base sm:text-lg font-black text-amber-950">{cat.ac}</span>
+                        </div>
                       </div>
-                      {/* Damage Indicator */}
-                      <AnimatePresence>
-                        {damageResult !== null && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 10, scale: 0.82 }}
-                            animate={{
-                              opacity: [0, 1, 1, 0],
-                              y: [10, -10, -30, -46],
-                              scale: [0.82, 1.08, 1, 0.96],
-                            }}
-                            exit={{ opacity: 0, scale: 0.9 }}
-                            transition={{ duration: 0.78, ease: 'easeOut' }}
-                            className={cn(
-                              "absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-xl border font-black font-serif tracking-wide drop-shadow-2xl whitespace-nowrap pointer-events-none z-20",
-                              isCriticalHit
-                                ? "text-red-100 text-2xl sm:text-3xl bg-red-900/90 border-red-300/80 shadow-[0_0_24px_rgba(239,68,68,0.45)]"
-                                : "text-red-100 text-xl sm:text-2xl bg-red-900/85 border-red-300/70"
-                            )}
-                          >
-                            -{damageResult} {isCriticalHit && "CRITICAL HIT"}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
 
-                    <div className="text-center space-y-1 sm:space-y-2">
-                      <h2 className="text-sm min-[380px]:text-base sm:text-xl font-serif text-amber-100">{cat.name}</h2>
-                      <div className="flex items-center justify-center gap-3 text-xs">
-                        <div className="flex items-center gap-1 text-red-400" title="Health Points">
-                          <Heart className="w-3 h-3" />
-                          <span>{cat.hp} / {cat.maxHp}</span>
+                      <div className="relative w-[94%]">
+                        <div
+                          className="w-full h-[6.3rem] min-[380px]:h-[7.1rem] sm:h-[11.4rem] transform-gpu transition-transform duration-700 flex items-center justify-center overflow-visible"
+                        >
+                          <img
+                            src={`/images/cats/cat_${level}.png`} 
+                            alt={cat.name}
+                            className="w-full h-full object-contain"
+                            referrerPolicy="no-referrer"
+                          />
                         </div>
-                        <div className="flex items-center gap-1 text-blue-400" title="Armor Class">
-                          <Shield className="w-3 h-3" />
-                          <span>{cat.ac}</span>
-                        </div>
+                        {/* Damage Indicator */}
+                        <AnimatePresence>
+                          {damageResult !== null && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 10, scale: 0.82 }}
+                              animate={{
+                                opacity: [0, 1, 1, 0],
+                                y: [10, -10, -30, -46],
+                                scale: [0.82, 1.08, 1, 0.96],
+                              }}
+                              exit={{ opacity: 0, scale: 0.9 }}
+                              transition={{ duration: 0.78, ease: 'easeOut' }}
+                              className={cn(
+                                "absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-xl border font-black font-serif tracking-wide drop-shadow-2xl whitespace-nowrap pointer-events-none z-20",
+                                isCriticalHit
+                                  ? "text-red-100 text-2xl sm:text-3xl bg-red-900/90 border-red-300/80 shadow-[0_0_24px_rgba(239,68,68,0.45)]"
+                                  : "text-red-100 text-xl sm:text-2xl bg-red-900/85 border-red-300/70"
+                              )}
+                            >
+                              -{damageResult} {isCriticalHit && "CRITICAL HIT"}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
-                      {/* Health Bar */}
-                      <div className="w-24 min-[380px]:w-28 sm:w-40 h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-1 mx-auto">
-                        <motion.div 
-                          className="h-full bg-red-500"
-                          initial={{ width: '100%' }}
-                          animate={{ width: `${Math.max(0, (cat.hp / cat.maxHp) * 100)}%` }}
-                          transition={{ duration: 0.5 }}
-                        />
+
+                      <div className="text-center space-y-1 sm:space-y-2 w-full">
+                        <h2 className="text-base min-[380px]:text-lg sm:text-[1.6rem] font-serif font-black tracking-[0.01em] text-amber-950">{cat.name}</h2>
+                        <div className="w-24 min-[380px]:w-28 sm:w-40 h-1.5 bg-amber-950/15 rounded-full overflow-hidden mt-1 mx-auto">
+                          <motion.div 
+                            className="h-full bg-red-500"
+                            initial={{ width: '100%' }}
+                            animate={{ width: `${Math.max(0, (cat.hp / cat.maxHp) * 100)}%` }}
+                            transition={{ duration: 0.5 }}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
                 <div className="cat-card-face cat-card-face-back">
-                  <div className="cat-card-back-pattern rounded-xl w-full h-full p-3">
-                    <div className="cat-card-back-frame rounded-lg w-full h-full flex items-center justify-center">
+                  <div className="cat-card-back-pattern rounded-[0.8rem] w-full h-full p-3">
+                    <div className="cat-card-back-frame rounded-[0.55rem] w-full h-full flex items-center justify-center">
                       <img
                         src="/images/elements/items/skull.png"
                         alt="skull"
