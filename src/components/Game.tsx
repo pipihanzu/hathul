@@ -333,7 +333,7 @@ export default function Game({
       setAvailablePotions(POTIONS_DB.slice(0, numPotions));
       setActivePotionEffects([]);
       
-      const firstTurn = Math.random() > 0.5 ? 'player' : 'opponent';
+        const firstTurn = lvl === 1 ? 'player' : (Math.random() > 0.5 ? 'player' : 'opponent');
       setTurn(firstTurn);
 
       addLog(`Level ${lvl}: A wild ${newCat.name} appears!`, 'info');
@@ -1068,13 +1068,6 @@ export default function Game({
                 <div className="cat-card-face cat-card-face-front">
                   <div className="cat-card-front-surface h-full w-full p-2 sm:p-3">
                     <div className="cat-card-front-frame relative flex h-full flex-col items-center justify-between gap-2 px-2 py-3 sm:gap-3 sm:px-3 sm:py-4">
-                      <div className="absolute right-2 top-2 sm:right-3 sm:top-3 flex items-center justify-center" title="Armor Class">
-                        <div className="relative flex h-11 w-10 min-[380px]:h-12 min-[380px]:w-11 sm:h-14 sm:w-12 items-center justify-center">
-                          <Shield className="absolute inset-0 h-full w-full fill-amber-300/20 text-amber-500" strokeWidth={1.8} />
-                          <span className="relative pt-0.5 text-sm min-[380px]:text-base sm:text-lg font-black text-amber-950">{cat.ac}</span>
-                        </div>
-                      </div>
-
                       <div className="relative w-[94%]">
                         <div
                           className="w-full h-[6.3rem] min-[380px]:h-[7.1rem] sm:h-[11.4rem] transform-gpu transition-transform duration-700 flex items-center justify-center overflow-visible"
@@ -1112,6 +1105,15 @@ export default function Game({
                       </div>
 
                       <div className="text-center space-y-1 sm:space-y-2 w-full">
+                        <div className="flex items-center justify-center" title="Armor Class">
+                          <div className="inline-flex items-center gap-2 rounded-full border border-amber-800/30 bg-amber-100/40 px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-[0_4px_14px_rgba(120,53,15,0.12)] backdrop-blur-sm">
+                            <div className="relative flex h-7 w-6 min-[380px]:h-8 min-[380px]:w-7 sm:h-10 sm:w-8 items-center justify-center shrink-0">
+                              <Shield className="absolute inset-0 h-full w-full fill-amber-300/20 text-amber-600" strokeWidth={1.8} />
+                              <span className="relative pt-0.5 text-[11px] min-[380px]:text-sm sm:text-base font-black text-amber-950">{cat.ac}</span>
+                            </div>
+                            <span className="text-[11px] min-[380px]:text-sm sm:text-base font-black uppercase tracking-[0.14em] text-amber-900">AC</span>
+                          </div>
+                        </div>
                         <h2 className="text-base min-[380px]:text-lg sm:text-[1.6rem] font-serif font-black tracking-[0.01em] text-amber-950">{cat.name}</h2>
                         <div className="w-24 min-[380px]:w-28 sm:w-40 h-1.5 bg-amber-950/15 rounded-full overflow-hidden mt-1 mx-auto">
                           <motion.div 
