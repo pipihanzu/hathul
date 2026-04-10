@@ -46,7 +46,9 @@ export default function App() {
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
   const musicAudioRef = useRef<HTMLAudioElement>(null);
+  const menuIntroAudioRef = useRef<HTMLAudioElement>(null);
   const shouldTryPlayRef = useRef(false);
+  const pendingMenuIntroPlayRef = useRef(false);
 
   const handleStartGame = () => {
     setGameState('playing');
@@ -133,13 +135,42 @@ export default function App() {
   }, [musicPlaybackState, musicTrackIndex]);
 
   useEffect(() => {
+    if (gameState !== 'start') return;
+
+    const introEl = menuIntroAudioRef.current;
+    if (!introEl) return;
+
+    introEl.currentTime = 0;
+    introEl.play().then(() => {
+      pendingMenuIntroPlayRef.current = false;
+    }).catch(() => {
+      // Autoplay can be blocked until user interaction.
+      pendingMenuIntroPlayRef.current = true;
+    });
+  }, [gameState]);
+
+  useEffect(() => {
     const onUserInteraction = () => {
-      if (!shouldTryPlayRef.current) return;
-      const musicEl = musicAudioRef.current;
-      if (!musicEl) return;
-      musicEl.play().catch(() => {
-        // Ignore; next interaction will retry.
-      });
+      if (shouldTryPlayRef.current) {
+        const musicEl = musicAudioRef.current;
+        if (musicEl) {
+          musicEl.play().catch(() => {
+            // Ignore; next interaction will retry.
+          });
+        }
+      }
+
+      if (pendingMenuIntroPlayRef.current && gameState === 'start') {
+        const introEl = menuIntroAudioRef.current;
+        if (!introEl) return;
+
+        introEl.currentTime = 0;
+        introEl.play().then(() => {
+          pendingMenuIntroPlayRef.current = false;
+        }).catch(() => {
+          // Keep pending true; a future interaction can retry.
+        });
+      }
     };
 
     window.addEventListener('pointerdown', onUserInteraction);
@@ -151,7 +182,7 @@ export default function App() {
       window.removeEventListener('keydown', onUserInteraction);
       window.removeEventListener('touchstart', onUserInteraction);
     };
-  }, []);
+  }, [gameState]);
 
   useEffect(() => {
     const musicEl = musicAudioRef.current;
@@ -171,6 +202,7 @@ export default function App() {
   return (
     <>
       <audio ref={musicAudioRef} src={MUSIC_TRACKS[musicTrackIndex]} preload="auto" />
+      <audio ref={menuIntroAudioRef} src="/sounds/letsplay.wav" preload="auto" />
 
       {gameState === 'playing' ? (
         <Game

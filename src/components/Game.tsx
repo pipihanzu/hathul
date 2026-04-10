@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Shield, Heart, Sword, Skull, Cat, ArrowRight, Volume2, VolumeX } from 'lucide-react';
+import { Shield, Heart, Sword, Skull, ArrowRight, Volume2, VolumeX } from 'lucide-react';
 import Dice3D from './Dice3D';
 import { cn } from '../lib/utils';
 
@@ -26,7 +26,7 @@ type PotionDef = {
 };
 
 const POTIONS_DB: PotionDef[] = [
-  { id: 'light_hand', name: 'Light Hand', desc: 'Next player damage is 1 HP', kind: 'Spell', effect: 'light_hand', icon: '/images/elements/items/feather.png', color: 'bg-yellow-900/50 text-yellow-500' },
+  { id: 'light_hand', name: 'Light Hand', desc: 'Next damage is 1 HP', kind: 'Spell', effect: 'light_hand', icon: '/images/elements/items/feather.png', color: 'bg-yellow-900/50 text-yellow-500' },
   { id: 'whiskey', name: 'Dwarven Hard Whiskey', desc: '-3 to your roll', kind: 'Drink', effect: 'roll_minus_3', icon: '/images/elements/items/whiskey.png', color: 'bg-orange-900/50 text-orange-500' },
   { id: 'heal', name: 'Heal Other', desc: '+2 HP to Cat', kind: 'Spell', effect: 'heal_cat_2', icon: '/images/elements/items/heal.png', color: 'bg-green-900/50 text-green-500' },
   { id: 'focus', name: 'Focus', desc: '+3 to your roll', kind: 'Spell', effect: 'roll_plus_3', icon: '/images/elements/items/pill.png', color: 'bg-blue-900/50 text-blue-500' },
@@ -107,6 +107,7 @@ export default function Game({
   const goblinWinAudioRef = useRef<HTMLAudioElement>(null);
   const catDieAudioRef = useRef<HTMLAudioElement>(null);
   const drinkAudioRef = useRef<HTMLAudioElement>(null);
+  const modifierAudioRef = useRef<HTMLAudioElement>(null);
 
   const [showVolumeModal, setShowVolumeModal] = useState(false);
   // Volume before muting, so we can restore it on unmute
@@ -134,6 +135,7 @@ export default function Game({
   const turnPulseIdRef = useRef(0);
   const turnPulseTimeoutRef = useRef<number | null>(null);
   const [isCatHitShaking, setIsCatHitShaking] = useState(false);
+  const [catEdgeHitFlashId, setCatEdgeHitFlashId] = useState(0);
   const catHitShakeTimeoutRef = useRef<number | null>(null);
 
   const SCORE_BASE_ROLL = 10;
@@ -269,10 +271,15 @@ export default function Game({
     });
   };
 
+  const triggerCatEdgeHitFlash = () => {
+    setCatEdgeHitFlashId((prev) => prev + 1);
+  };
+
   useEffect(() => {
     if (damageResult === null) return;
 
     triggerCatHitShake();
+    triggerCatEdgeHitFlash();
   }, [damageResult]);
 
   useEffect(() => {
@@ -299,47 +306,51 @@ export default function Game({
       ac: Math.floor(Math.random() * 7) + 4, // 4-10
     };
     newCat.maxHp = newCat.hp;
-    
-    setCat(newCat);
-    setLevel(lvl);
-    setGameState('playing');
-    setRollPhase('idle');
-    setRollResult(null);
-    setDamageResult(null);
-    setIsCriticalHit(false);
-    setIsWaitingForNextTurn(false);
-    setLogs([]);
-    setLeaderboardState('idle');
-    setLeaderboardName('');
-    setLeaderboardMessage(null);
-    setLeaderboardRank(null);
-    hasCheckedLeaderboardRef.current = false;
-    setCritRollIndicator(null);
 
-    if (critRollTimeoutRef.current !== null) {
-      window.clearTimeout(critRollTimeoutRef.current);
-      critRollTimeoutRef.current = null;
-    }
-    
-    const numPotions = Math.min(6, lvl + 1);
-    setAvailablePotions(POTIONS_DB.slice(0, numPotions));
-    setActivePotionEffects([]);
-    
-    const firstTurn = Math.random() > 0.5 ? 'player' : 'opponent';
-    setTurn(firstTurn);
+    const initGame = () => {
+      setCat(newCat);
+      setLevel(lvl);
+      setGameState('playing');
+      setRollPhase('idle');
+      setRollResult(null);
+      setDamageResult(null);
+      setIsCriticalHit(false);
+      setIsWaitingForNextTurn(false);
+      setLogs([]);
+      setLeaderboardState('idle');
+      setLeaderboardName('');
+      setLeaderboardMessage(null);
+      setLeaderboardRank(null);
+      hasCheckedLeaderboardRef.current = false;
+      setCritRollIndicator(null);
 
-    addLog(`Level ${lvl}: A wild ${newCat.name} appears!`, 'info');
-    addLog(`${firstTurn === 'player' ? 'Player goes' : GOBLINS[lvl - 1].name + ' goes'} first.`, 'info');
+      if (critRollTimeoutRef.current !== null) {
+        window.clearTimeout(critRollTimeoutRef.current);
+        critRollTimeoutRef.current = null;
+      }
+      
+      const numPotions = Math.min(6, lvl + 1);
+      setAvailablePotions(POTIONS_DB.slice(0, numPotions));
+      setActivePotionEffects([]);
+      
+      const firstTurn = Math.random() > 0.5 ? 'player' : 'opponent';
+      setTurn(firstTurn);
 
-    if (firstTurn === 'player' && yourTurnAudioRef.current) {
-      yourTurnAudioRef.current.currentTime = 0;
-      yourTurnAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
-    }
+      addLog(`Level ${lvl}: A wild ${newCat.name} appears!`, 'info');
+      addLog(`${firstTurn === 'player' ? 'Player goes' : GOBLINS[lvl - 1].name + ' goes'} first.`, 'info');
 
-    if (firstTurn === 'opponent' && goblinTurnAudioRef.current) {
-      goblinTurnAudioRef.current.currentTime = 0;
-      goblinTurnAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
-    }
+      if (firstTurn === 'player' && yourTurnAudioRef.current) {
+        yourTurnAudioRef.current.currentTime = 0;
+        yourTurnAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
+      }
+
+      if (firstTurn === 'opponent' && goblinTurnAudioRef.current) {
+        goblinTurnAudioRef.current.currentTime = 0;
+        goblinTurnAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
+      }
+    };
+
+    initGame();
   };
 
   // Initialize first level
@@ -446,7 +457,7 @@ export default function Game({
     potionPreviewTimeoutRef.current = window.setTimeout(() => {
       setPotionPreview(null);
       potionPreviewTimeoutRef.current = null;
-    }, 2700);
+    }, 2000);
     
     setAvailablePotions(prev => prev.filter(p => p.id !== potion.id));
     
@@ -457,6 +468,7 @@ export default function Game({
       if (cat) {
         const newHp = Math.max(0, cat.hp - 2);
         setCat({ ...cat, hp: newHp });
+        triggerCatEdgeHitFlash();
         triggerHitHaptic();
         addLog(`Player used ${potion.name}! Cat takes 2 damage.`, 'info');
         if (newHp <= 0) {
@@ -489,8 +501,15 @@ export default function Game({
     if (activePotionEffects.includes('cat_ac_minus_2')) effectiveAc -= 2;
 
     if (turn === 'player') {
+      const hasRollModifier = activePotionEffects.includes('roll_minus_3') || activePotionEffects.includes('roll_plus_3');
       if (activePotionEffects.includes('roll_minus_3')) atkBonus -= 3;
       if (activePotionEffects.includes('roll_plus_3')) atkBonus += 3;
+      
+      // Play modifier sound if a roll modifier was applied
+      if (hasRollModifier && modifierAudioRef.current) {
+        modifierAudioRef.current.currentTime = 0;
+        modifierAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
+      }
     }
     
     if (rollPhase === 'd20') {
@@ -530,14 +549,9 @@ export default function Game({
       }
 
       if (hit) {
+        triggerCatEdgeHitFlash();
         triggerCatHitShake();
         addLog(`Hit!`, 'hit');
-        
-        // Play hit sound
-        if (hitAudioRef.current) {
-          hitAudioRef.current.currentTime = 0;
-          hitAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
-        }
         
         if (turn === 'player') {
           setRollPhase('waiting-d6');
@@ -630,6 +644,12 @@ export default function Game({
       
       const newHp = Math.max(0, cat.hp - totalDamage);
       setCat({ ...cat, hp: newHp });
+
+      if (hitAudioRef.current) {
+        hitAudioRef.current.currentTime = 0;
+        hitAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
+      }
+
       triggerHitHaptic();
       
       if (damageDetails !== `${diceDamage}`) {
@@ -830,10 +850,23 @@ export default function Game({
   const caveImage = `cave${Math.min(level, maxCaveIndex)}`;
   const isOpponentPulseActive = turnPulse?.target === 'opponent';
   const isPlayerPulseActive = turnPulse?.target === 'player';
+  const isCatDead = cat.hp <= 0;
   const levelClearedComment = LEVEL_CLEARED_COMMENTS[level] || "The goblin handled the cat. Fate handled your soul.";
 
   return (
     <div className="h-[100dvh] w-full bg-zinc-950 text-zinc-200 font-sans relative overflow-hidden">
+      <AnimatePresence>
+        {catEdgeHitFlashId > 0 && (
+          <motion.div
+            key={catEdgeHitFlashId}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 1, 0.2, 0.92, 0] }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.26, ease: 'easeOut', times: [0, 0.14, 0.35, 0.62, 1] }}
+            className="cat-hit-edge-flash pointer-events-none absolute inset-0 z-[58]"
+          />
+        )}
+      </AnimatePresence>
       <div className="relative h-full w-full max-w-2xl mx-auto flex flex-col overflow-hidden">
         <div
           className="absolute inset-0 bg-center bg-cover pointer-events-none"
@@ -854,11 +887,11 @@ export default function Game({
         {critRollIndicator && (
           <motion.div
             key={critRollIndicator.id}
-            initial={{ opacity: 0, y: 18, scale: 0.94 }}
+            initial={{ opacity: 0, y: -18, scale: 0.94 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -12, scale: 0.95 }}
+            exit={{ opacity: 0, y: 12, scale: 0.95 }}
             transition={{ duration: 0.28, ease: 'easeOut' }}
-            className="absolute top-20 left-1/2 -translate-x-1/2 z-[60] pointer-events-none"
+            className="absolute bottom-24 left-1/2 -translate-x-1/2 z-[60] pointer-events-none"
           >
             <div
               className={cn(
@@ -1027,63 +1060,84 @@ export default function Game({
             )}
             style={{ perspective: 1200, transformStyle: 'preserve-3d', transformOrigin: '50% 50%' }}
           >
-            <div className="flex flex-col items-center gap-2 sm:gap-3">
-              <div className="relative">
-                <div
-                  className="w-32 h-32 sm:w-36 sm:h-36 rounded-2xl bg-zinc-900/80 shadow-2xl transform-gpu rotate-1 transition-transform duration-700 flex items-center justify-center overflow-hidden"
-                >
-                  <img
-                    src={`/images/cats/cat_${level}.png`} 
-                    alt={cat.name}
-                    className="w-full h-full object-cover rounded-2xl"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
-                {/* Damage Indicator */}
-                <AnimatePresence>
-                  {damageResult !== null && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10, scale: 0.82 }}
-                      animate={{
-                        opacity: [0, 1, 1, 0],
-                        y: [10, -10, -30, -46],
-                        scale: [0.82, 1.08, 1, 0.96],
-                      }}
-                      exit={{ opacity: 0, scale: 0.9 }}
-                      transition={{ duration: 0.78, ease: 'easeOut' }}
-                      className={cn(
-                        "absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-xl border font-black font-serif tracking-wide drop-shadow-2xl whitespace-nowrap pointer-events-none z-20",
-                        isCriticalHit
-                          ? "text-red-100 text-2xl sm:text-3xl bg-red-900/90 border-red-300/80 shadow-[0_0_24px_rgba(239,68,68,0.45)]"
-                          : "text-red-100 text-xl sm:text-2xl bg-red-900/85 border-red-300/70"
-                      )}
-                    >
-                      -{damageResult} {isCriticalHit && "CRITICAL HIT"}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-              
-              <div className="text-center space-y-1 sm:space-y-2">
-                <h2 className="text-xl font-serif text-amber-100">{cat.name}</h2>
-                <div className="flex items-center justify-center gap-3 text-xs">
-                  <div className="flex items-center gap-1 text-red-400" title="Health Points">
-                    <Heart className="w-3 h-3" />
-                    <span>{cat.hp} / {cat.maxHp}</span>
+            <div className="cat-card-flip-shell w-[14rem] sm:w-[15.5rem] h-[20rem] sm:h-[22rem]">
+              <div
+                className="cat-card-flip-inner"
+                style={{ transform: isCatDead ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
+              >
+                <div className="cat-card-face cat-card-face-front">
+                  <div className="flex flex-col items-center gap-2 sm:gap-3 h-full justify-center">
+                    <div className="relative">
+                      <div
+                        className="w-32 h-32 sm:w-36 sm:h-36 rounded-2xl bg-zinc-900/80 shadow-2xl transform-gpu rotate-1 transition-transform duration-700 flex items-center justify-center overflow-hidden"
+                      >
+                        <img
+                          src={`/images/cats/cat_${level}.png`} 
+                          alt={cat.name}
+                          className="w-full h-full object-cover rounded-2xl"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                      {/* Damage Indicator */}
+                      <AnimatePresence>
+                        {damageResult !== null && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10, scale: 0.82 }}
+                            animate={{
+                              opacity: [0, 1, 1, 0],
+                              y: [10, -10, -30, -46],
+                              scale: [0.82, 1.08, 1, 0.96],
+                            }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            transition={{ duration: 0.78, ease: 'easeOut' }}
+                            className={cn(
+                              "absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-xl border font-black font-serif tracking-wide drop-shadow-2xl whitespace-nowrap pointer-events-none z-20",
+                              isCriticalHit
+                                ? "text-red-100 text-2xl sm:text-3xl bg-red-900/90 border-red-300/80 shadow-[0_0_24px_rgba(239,68,68,0.45)]"
+                                : "text-red-100 text-xl sm:text-2xl bg-red-900/85 border-red-300/70"
+                            )}
+                          >
+                            -{damageResult} {isCriticalHit && "CRITICAL HIT"}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    <div className="text-center space-y-1 sm:space-y-2">
+                      <h2 className="text-xl font-serif text-amber-100">{cat.name}</h2>
+                      <div className="flex items-center justify-center gap-3 text-xs">
+                        <div className="flex items-center gap-1 text-red-400" title="Health Points">
+                          <Heart className="w-3 h-3" />
+                          <span>{cat.hp} / {cat.maxHp}</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-blue-400" title="Armor Class">
+                          <Shield className="w-3 h-3" />
+                          <span>{cat.ac}</span>
+                        </div>
+                      </div>
+                      {/* Health Bar */}
+                      <div className="w-36 sm:w-40 h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-1 mx-auto">
+                        <motion.div 
+                          className="h-full bg-red-500"
+                          initial={{ width: '100%' }}
+                          animate={{ width: `${Math.max(0, (cat.hp / cat.maxHp) * 100)}%` }}
+                          transition={{ duration: 0.5 }}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 text-blue-400" title="Armor Class">
-                    <Shield className="w-3 h-3" />
-                    <span>{cat.ac}</span>
-                  </div>
                 </div>
-                {/* Health Bar */}
-                <div className="w-36 sm:w-40 h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-1 mx-auto">
-                  <motion.div 
-                    className="h-full bg-red-500"
-                    initial={{ width: '100%' }}
-                    animate={{ width: `${Math.max(0, (cat.hp / cat.maxHp) * 100)}%` }}
-                    transition={{ duration: 0.5 }}
-                  />
+                <div className="cat-card-face cat-card-face-back">
+                  <div className="cat-card-back-pattern rounded-xl w-full h-full p-3">
+                    <div className="cat-card-back-frame rounded-lg w-full h-full flex items-center justify-center">
+                      <img
+                        src="/images/elements/items/skull.png"
+                        alt="skull"
+                        className="w-32 h-32 sm:w-40 sm:h-40 object-contain"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1093,14 +1147,14 @@ export default function Game({
         {/* Player Area Container */}
         <div className="flex flex-col gap-2 shrink-0 w-full mx-auto">
           {/* Potions Bar */}
-          <div className="grid grid-cols-5 gap-2 bg-zinc-900/80 p-2 rounded-lg border border-zinc-800">
+          <div className="grid grid-cols-5 gap-2 bg-zinc-900/80 p-2 rounded-lg border border-zinc-800 auto-rows-min">
             {availablePotions.map((potion) => (
-              <div key={potion.id} className="w-full h-20 sm:h-24 rounded flex items-center justify-center relative overflow-hidden">
+              <div key={potion.id} className="w-full rounded flex flex-col items-center justify-start gap-1 px-1 min-h-0">
                 <button
                   onClick={() => usePotion(potion)}
                   disabled={gameState !== 'playing'}
                   className={cn(
-                    "w-full h-full flex flex-col items-center justify-center gap-1 px-1 transition-all bg-transparent",
+                    "flex flex-shrink-0 items-center justify-center transition-all bg-transparent",
                     gameState === 'playing' ? "hover:brightness-125 cursor-pointer active:scale-95" : "opacity-50 cursor-not-allowed"
                   )}
                   title={`${potion.name}: ${potion.desc}`}
@@ -1108,13 +1162,13 @@ export default function Game({
                   <img
                     src={potion.icon}
                     alt={potion.name}
-                    className="w-10 h-10 object-contain scale-[1.7]"
+                    className="w-10 h-10 object-contain flex-shrink-0"
                     referrerPolicy="no-referrer"
                   />
-                  <span className="mt-3 text-[10px] sm:text-xs leading-tight text-zinc-100 font-semibold text-center whitespace-normal break-words">
-                    {potion.desc}
-                  </span>
                 </button>
+                <span className="text-[10px] sm:text-xs leading-tight text-zinc-100 font-semibold text-center whitespace-normal break-words flex-1">
+                  {potion.desc}
+                </span>
               </div>
             ))}
           </div>
@@ -1180,7 +1234,7 @@ export default function Game({
                 className={cn(
                   "px-4 py-2 text-sm font-bold rounded-sm transition-colors flex items-center gap-2 disabled:bg-zinc-800 disabled:text-zinc-600",
                   rollPhase === 'waiting-d6' 
-                    ? "bg-red-600 hover:bg-red-500 text-white" 
+                    ? "bg-red-600 hover:bg-red-500 text-white animate-pulse" 
                     : "bg-amber-600 hover:bg-amber-500 text-zinc-950"
                 )}
               >
@@ -1418,6 +1472,7 @@ export default function Game({
       <audio ref={goblinWinAudioRef} src="/sounds/goblinwin.wav" preload="auto" />
       <audio ref={catDieAudioRef} src="/sounds/catdie.wav" preload="auto" />
       <audio ref={drinkAudioRef} src="/sounds/drink.wav" preload="auto" />
+      <audio ref={modifierAudioRef} src="/sounds/modificator.wav" preload="auto" />
       </div>
     </div>
   );
