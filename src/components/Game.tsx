@@ -107,6 +107,9 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
   const [potionPreview, setPotionPreview] = useState<{ id: number; icon: string; name: string; desc: string } | null>(null);
   const potionPreviewIdRef = useRef(0);
   const potionPreviewTimeoutRef = useRef<number | null>(null);
+  const [critRollIndicator, setCritRollIndicator] = useState<{ id: number; text: string; tone: 'hit' | 'miss' } | null>(null);
+  const critRollIndicatorIdRef = useRef(0);
+  const critRollTimeoutRef = useRef<number | null>(null);
 
   const SCORE_BASE_ROLL = 10;
   const SCORE_CRITICAL_ROLL = 30;
@@ -217,6 +220,9 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
       if (potionPreviewTimeoutRef.current !== null) {
         window.clearTimeout(potionPreviewTimeoutRef.current);
       }
+      if (critRollTimeoutRef.current !== null) {
+        window.clearTimeout(critRollTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -243,6 +249,12 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
     setLeaderboardMessage(null);
     setLeaderboardRank(null);
     hasCheckedLeaderboardRef.current = false;
+    setCritRollIndicator(null);
+
+    if (critRollTimeoutRef.current !== null) {
+      window.clearTimeout(critRollTimeoutRef.current);
+      critRollTimeoutRef.current = null;
+    }
     
     const numPotions = Math.min(6, lvl + 1);
     setAvailablePotions(POTIONS_DB.slice(0, numPotions));
@@ -475,6 +487,24 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
       const totalAtk = rollResult + atkBonus;
       const hit = totalAtk >= effectiveAc || isCriticalHit; // 20 always hits
       setIsCriticalHit(isCriticalHit);
+
+      if (isCriticalRoll) {
+        const indicatorId = critRollIndicatorIdRef.current++;
+        setCritRollIndicator({
+          id: indicatorId,
+          text: rollResult === 20 ? 'NAT 20 - CRITICAL HIT' : 'NAT 1 - CRITICAL MISS',
+          tone: rollResult === 20 ? 'hit' : 'miss',
+        });
+
+        if (critRollTimeoutRef.current !== null) {
+          window.clearTimeout(critRollTimeoutRef.current);
+        }
+
+        critRollTimeoutRef.current = window.setTimeout(() => {
+          setCritRollIndicator((current) => (current?.id === indicatorId ? null : current));
+          critRollTimeoutRef.current = null;
+        }, 1200);
+      }
       
       if (atkBonus !== 0) {
         const sign = atkBonus > 0 ? '+' : '-';
@@ -504,6 +534,12 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
           setTimeout(() => {
             setRollPhase('d6');
             setRollResult(null);
+
+            // Play dice roll sound for opponent damage roll as well.
+            if (diceRollAudioRef.current) {
+              diceRollAudioRef.current.currentTime = 0;
+              diceRollAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
+            }
             
             addLog(`${attackerName} is rolling damage...`, 'info');
             setTimeout(() => {
@@ -722,11 +758,12 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
   const caveImage = `cave${Math.min(level, maxCaveIndex)}`;
 
   return (
-    <div className="h-[100dvh] w-full bg-zinc-950 text-zinc-200 font-sans flex flex-col relative overflow-hidden">
-      <div
-        className="absolute inset-0 bg-center bg-cover pointer-events-none"
-        style={{ backgroundImage: `url('/images/elements/caves/${caveImage}.png')` }}
-      />
+    <div className="h-[100dvh] w-full bg-zinc-950 text-zinc-200 font-sans relative overflow-hidden">
+      <div className="relative h-full w-full max-w-2xl mx-auto flex flex-col overflow-hidden">
+        <div
+          className="absolute inset-0 bg-center bg-cover pointer-events-none"
+          style={{ backgroundImage: `url('/images/elements/caves/${caveImage}.png')` }}
+        />
       {/* 3D Dice Overlay */}
       {rollPhase !== 'idle' && (
         <Dice3D 
@@ -737,6 +774,30 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
           onRollComplete={onRollComplete} 
         />
       )}
+
+      <AnimatePresence>
+        {critRollIndicator && (
+          <motion.div
+            key={critRollIndicator.id}
+            initial={{ opacity: 0, y: 18, scale: 0.94 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -12, scale: 0.95 }}
+            transition={{ duration: 0.28, ease: 'easeOut' }}
+            className="absolute top-20 left-1/2 -translate-x-1/2 z-[60] pointer-events-none"
+          >
+            <div
+              className={cn(
+                "px-4 py-2 rounded-xl border-2 font-black font-serif tracking-wide text-lg sm:text-xl whitespace-nowrap shadow-2xl",
+                critRollIndicator.tone === 'hit'
+                  ? "text-amber-100 bg-amber-900/90 border-amber-300/80"
+                  : "text-red-100 bg-red-900/90 border-red-300/80"
+              )}
+            >
+              {critRollIndicator.text}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Header */}
       <header className="shrink-0 p-2 px-4 border-b border-zinc-900 flex flex-wrap justify-between items-center gap-2 bg-zinc-950/80 backdrop-blur z-10">
@@ -800,7 +861,7 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
       </AnimatePresence>
 
       {/* Battlefield */}
-      <main className="flex-1 min-h-0 flex flex-col p-2 gap-2 sm:gap-4 max-w-2xl mx-auto w-full z-10">
+      <main className="flex-1 min-h-0 flex flex-col p-2 gap-2 sm:gap-4 w-full z-10">
         
         {/* Opponent Area */}
         <div className={cn(
@@ -883,11 +944,11 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
                       className={cn(
                         "absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-xl border font-black font-serif tracking-wide drop-shadow-2xl whitespace-nowrap pointer-events-none z-20",
                         isCriticalHit
-                          ? "text-fuchsia-100 text-2xl sm:text-3xl bg-fuchsia-900/85 border-fuchsia-300/70"
+                          ? "text-amber-100 text-2xl sm:text-3xl bg-amber-900/90 border-amber-300/80 shadow-[0_0_24px_rgba(245,158,11,0.45)]"
                           : "text-red-100 text-xl sm:text-2xl bg-red-900/85 border-red-300/70"
                       )}
                     >
-                      -{damageResult} {isCriticalHit && "CRIT!"}
+                      -{damageResult} {isCriticalHit && "CRITICAL HIT"}
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -1063,9 +1124,15 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 bg-zinc-950/90 backdrop-blur-sm flex items-center justify-center p-6 text-center"
+            className="absolute inset-0 z-50 flex items-center justify-center p-6 text-center overflow-hidden"
           >
-            <div className="max-w-md w-full space-y-8">
+            <div
+              className="absolute inset-0 bg-center bg-cover"
+              style={{ backgroundImage: `url('/images/elements/caves/${caveImage}.png')` }}
+            />
+            <div className="absolute inset-0 bg-zinc-950/28 backdrop-blur-[1px]" />
+
+            <div className="relative z-10 max-w-md w-full space-y-8">
               {gameState === 'gameOver' && (
                 <>
                   <h2 className="text-5xl font-serif text-red-500">You Lose</h2>
@@ -1123,6 +1190,7 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
       <audio ref={goblinWinAudioRef} src="/sounds/goblinwin.wav" preload="auto" />
       <audio ref={catDieAudioRef} src="/sounds/catdie.wav" preload="auto" />
       <audio ref={drinkAudioRef} src="/sounds/drink.wav" preload="auto" />
+      </div>
     </div>
   );
 }
