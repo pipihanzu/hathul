@@ -13,24 +13,26 @@ type CatEntity = {
   ac: number;
 };
 
-type PotionEffect = 'roll_minus_3' | 'heal_cat_2' | 'roll_plus_3' | 'cat_ac_plus_2' | 'cat_ac_minus_2' | 'damage_cat_2';
+type PotionEffect = 'roll_minus_3' | 'heal_cat_2' | 'roll_plus_3' | 'cat_ac_plus_2' | 'cat_ac_minus_2' | 'damage_cat_2' | 'light_hand';
 
 type PotionDef = {
   id: string;
   name: string;
   desc: string;
+  kind: 'Drink' | 'Spell';
   effect: PotionEffect;
   icon: string;
   color: string;
 };
 
 const POTIONS_DB: PotionDef[] = [
-  { id: 'whiskey', name: 'Whiskey', desc: '-3 to your roll', effect: 'roll_minus_3', icon: '/images/elements/items/whiskey.png', color: 'bg-orange-900/50 text-orange-500' },
-  { id: 'heal', name: 'Heal Other', desc: '+2 HP to Cat', effect: 'heal_cat_2', icon: '/images/elements/items/heal.png', color: 'bg-green-900/50 text-green-500' },
-  { id: 'focus', name: 'Focus', desc: '+3 to your roll', effect: 'roll_plus_3', icon: '/images/elements/items/pill.png', color: 'bg-blue-900/50 text-blue-500' },
-  { id: 'shield', name: 'Cat Shield', desc: '+2 Cat AC', effect: 'cat_ac_plus_2', icon: '/images/elements/items/catshield.png', color: 'bg-indigo-900/50 text-indigo-500' },
-  { id: 'vuln', name: 'Cat Vuln', desc: '-2 Cat AC', effect: 'cat_ac_minus_2', icon: '/images/elements/items/catnip.png', color: 'bg-red-900/50 text-red-500' },
-  { id: 'poison', name: 'Poison', desc: '-2 HP to Cat', effect: 'damage_cat_2', icon: '/images/elements/items/skull.png', color: 'bg-purple-900/50 text-purple-500' },
+  { id: 'light_hand', name: 'Light Hand', desc: 'Next player damage is 1 HP', kind: 'Spell', effect: 'light_hand', icon: '/images/elements/items/feather.png', color: 'bg-yellow-900/50 text-yellow-500' },
+  { id: 'whiskey', name: 'Dwarven Hard Whiskey', desc: '-3 to your roll', kind: 'Drink', effect: 'roll_minus_3', icon: '/images/elements/items/whiskey.png', color: 'bg-orange-900/50 text-orange-500' },
+  { id: 'heal', name: 'Heal Other', desc: '+2 HP to Cat', kind: 'Spell', effect: 'heal_cat_2', icon: '/images/elements/items/heal.png', color: 'bg-green-900/50 text-green-500' },
+  { id: 'focus', name: 'Focus', desc: '+3 to your roll', kind: 'Spell', effect: 'roll_plus_3', icon: '/images/elements/items/pill.png', color: 'bg-blue-900/50 text-blue-500' },
+  { id: 'shield', name: 'Cat Shield', desc: '+2 Cat AC', kind: 'Spell', effect: 'cat_ac_plus_2', icon: '/images/elements/items/catshield.png', color: 'bg-indigo-900/50 text-indigo-500' },
+  { id: 'vuln', name: 'Cat Vuln', desc: '-2 Cat AC', kind: 'Spell', effect: 'cat_ac_minus_2', icon: '/images/elements/items/catnip.png', color: 'bg-red-900/50 text-red-500' },
+  { id: 'poison', name: 'Poison', desc: '-2 HP to Cat', kind: 'Spell', effect: 'damage_cat_2', icon: '/images/elements/items/skull.png', color: 'bg-purple-900/50 text-purple-500' },
 ];
 
 type Goblin = {
@@ -122,7 +124,7 @@ export default function Game({
   const [leaderboardMessage, setLeaderboardMessage] = useState<string | null>(null);
   const [leaderboardRank, setLeaderboardRank] = useState<number | null>(null);
   const hasCheckedLeaderboardRef = useRef(false);
-  const [potionPreview, setPotionPreview] = useState<{ id: number; icon: string; name: string; desc: string } | null>(null);
+  const [potionPreview, setPotionPreview] = useState<{ id: number; icon: string; name: string; desc: string; kind: 'Drink' | 'Spell' } | null>(null);
   const potionPreviewIdRef = useRef(0);
   const potionPreviewTimeoutRef = useRef<number | null>(null);
   const [critRollIndicator, setCritRollIndicator] = useState<{ id: number; text: string; tone: 'hit' | 'miss' } | null>(null);
@@ -437,14 +439,14 @@ export default function Game({
     }
 
     const previewId = potionPreviewIdRef.current++;
-    setPotionPreview({ id: previewId, icon: potion.icon, name: potion.name, desc: potion.desc });
+    setPotionPreview({ id: previewId, icon: potion.icon, name: potion.name, desc: potion.desc, kind: potion.kind });
     if (potionPreviewTimeoutRef.current !== null) {
       window.clearTimeout(potionPreviewTimeoutRef.current);
     }
     potionPreviewTimeoutRef.current = window.setTimeout(() => {
       setPotionPreview(null);
       potionPreviewTimeoutRef.current = null;
-    }, 1500);
+    }, 2700);
     
     setAvailablePotions(prev => prev.filter(p => p.id !== potion.id));
     
@@ -585,6 +587,16 @@ export default function Game({
       const diceDamage = isCriticalHit ? baseDamage * 2 : baseDamage;
       let totalDamage = diceDamage;
       let damageDetails = `${diceDamage}`;
+      const isLightHandActive = turn === 'player' && activePotionEffects.includes('light_hand');
+
+      if (isLightHandActive) {
+        totalDamage = 1;
+        damageDetails = 'Light Hand -> fixed 1';
+        if (isCriticalHit) {
+          setIsCriticalHit(false);
+        }
+        setActivePotionEffects(prev => prev.filter(effect => effect !== 'light_hand'));
+      }
 
       if (turn === 'opponent') {
         const dmgBonus = currentGoblin.dmgBonus || 0;
@@ -620,7 +632,7 @@ export default function Game({
       setCat({ ...cat, hp: newHp });
       triggerHitHaptic();
       
-      if (turn === 'opponent' && damageDetails !== `${diceDamage}`) {
+      if (damageDetails !== `${diceDamage}`) {
         addLog(`Dealt ${totalDamage} damage (${damageDetails})${isCriticalHit ? ' (Doubled!)' : ''}.`, 'hit');
       } else {
         addLog(`Dealt ${totalDamage} damage${isCriticalHit ? ' (Doubled!)' : ''}.`, 'hit');
@@ -910,14 +922,18 @@ export default function Game({
             transition={{ duration: 0.24, ease: 'easeInOut' }}
             className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center"
           >
-            <div className="w-[360px] max-w-[90vw] rounded-2xl border border-amber-400/60 bg-zinc-900/95 shadow-2xl p-6 flex flex-col items-center justify-center gap-4">
+            <div className="w-[380px] max-w-[90vw] rounded-2xl border border-amber-300/70 bg-zinc-900/96 shadow-2xl p-6 flex flex-col items-center justify-center gap-4">
               <img
                 src={potionPreview.icon}
                 alt={potionPreview.name}
                 className="w-[292px] h-[292px] max-w-[70vw] max-h-[50vh] object-contain"
                 referrerPolicy="no-referrer"
               />
-              <p className="text-amber-100 text-sm text-center leading-snug">{potionPreview.desc}</p>
+              <div className="w-full text-center space-y-1">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-amber-300/90 font-semibold">{potionPreview.kind}</p>
+                <h3 className="text-2xl leading-tight font-serif text-amber-100 font-bold">{potionPreview.name}</h3>
+                <p className="text-zinc-100 text-base leading-relaxed font-semibold">{potionPreview.desc}</p>
+              </div>
             </div>
           </motion.div>
         )}
@@ -1095,7 +1111,7 @@ export default function Game({
                     className="w-10 h-10 object-contain scale-[1.7]"
                     referrerPolicy="no-referrer"
                   />
-                  <span className="mt-3 text-[9px] sm:text-[10px] leading-tight text-zinc-300 text-center whitespace-normal break-words">
+                  <span className="mt-3 text-[10px] sm:text-xs leading-tight text-zinc-100 font-semibold text-center whitespace-normal break-words">
                     {potion.desc}
                   </span>
                 </button>
