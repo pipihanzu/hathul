@@ -140,6 +140,9 @@ export default function Game({
   const [isCatHitShaking, setIsCatHitShaking] = useState(false);
   const [catEdgeHitFlashId, setCatEdgeHitFlashId] = useState(0);
   const catHitShakeTimeoutRef = useRef<number | null>(null);
+  const [isCatFrontContentHidden, setIsCatFrontContentHidden] = useState(false);
+  const [isCatCardFlipped, setIsCatCardFlipped] = useState(false);
+  const catFlipTimeoutRef = useRef<number | null>(null);
 
   const SCORE_BASE_ROLL = 10;
   const SCORE_CRITICAL_ROLL = 30;
@@ -258,8 +261,32 @@ export default function Game({
       if (catHitShakeTimeoutRef.current !== null) {
         window.clearTimeout(catHitShakeTimeoutRef.current);
       }
+      if (catFlipTimeoutRef.current !== null) {
+        window.clearTimeout(catFlipTimeoutRef.current);
+      }
     };
   }, []);
+
+  useEffect(() => {
+    if (!cat || cat.hp > 0) {
+      setIsCatFrontContentHidden(false);
+      setIsCatCardFlipped(false);
+      if (catFlipTimeoutRef.current !== null) {
+        window.clearTimeout(catFlipTimeoutRef.current);
+        catFlipTimeoutRef.current = null;
+      }
+      return;
+    }
+
+    setIsCatFrontContentHidden(true);
+    if (catFlipTimeoutRef.current !== null) {
+      window.clearTimeout(catFlipTimeoutRef.current);
+    }
+    catFlipTimeoutRef.current = window.setTimeout(() => {
+      setIsCatCardFlipped(true);
+      catFlipTimeoutRef.current = null;
+    }, 190);
+  }, [cat]);
 
   const triggerCatHitShake = () => {
     setIsCatHitShaking(false);
@@ -1097,7 +1124,7 @@ export default function Game({
             <div className="cat-card-flip-shell w-[clamp(10rem,41vw,12.4rem)] sm:w-[16rem] h-[clamp(13.9rem,37dvh,17.7rem)] sm:h-[22.1rem] overflow-hidden rounded-[0.8rem]">
               <div
                 className="cat-card-flip-inner"
-                style={{ transform: isCatDead ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
+                style={{ transform: isCatCardFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
               >
                 <div className="cat-card-face cat-card-face-front">
                   <div className="cat-card-front-surface h-full w-full p-2 sm:p-3">
@@ -1115,7 +1142,7 @@ export default function Game({
                         </div>
                         {/* Damage Indicator */}
                         <AnimatePresence>
-                          {damageResult !== null && (
+                          {!isCatFrontContentHidden && damageResult !== null && (
                             <motion.div
                               initial={{ opacity: 0, y: 10, scale: 0.82 }}
                               animate={{
@@ -1138,7 +1165,12 @@ export default function Game({
                         </AnimatePresence>
                       </div>
 
-                      <div className="text-center space-y-1 sm:space-y-2 w-full">
+                      <div
+                        className={cn(
+                          "text-center space-y-1 sm:space-y-2 w-full shrink-0 transition-opacity duration-150",
+                          isCatFrontContentHidden ? 'opacity-0' : 'opacity-100'
+                        )}
+                      >
                         <div className="flex items-center justify-center" title="Armor Class">
                           <div className="inline-flex items-center gap-3 rounded-full border border-amber-800/30 bg-amber-100/40 px-4 py-2 sm:px-5 sm:py-3 shadow-[0_4px_14px_rgba(120,53,15,0.12)] backdrop-blur-sm">
                             <div className="relative flex h-10 w-9 min-[380px]:h-12 min-[380px]:w-10 sm:h-14 sm:w-12 items-center justify-center shrink-0">
@@ -1149,13 +1181,16 @@ export default function Game({
                           </div>
                         </div>
                         <h2 className="text-base min-[380px]:text-lg sm:text-[1.6rem] font-serif font-black tracking-[0.01em] text-amber-950">{cat.name}</h2>
-                        <div className="w-24 min-[380px]:w-28 sm:w-40 h-1.5 bg-amber-950/15 rounded-full overflow-hidden mt-1 mx-auto">
-                          <motion.div 
-                            className="h-full bg-red-500"
-                            initial={{ width: '100%' }}
-                            animate={{ width: `${Math.max(0, (cat.hp / cat.maxHp) * 100)}%` }}
-                            transition={{ duration: 0.5 }}
-                          />
+                        <div className="w-24 min-[380px]:w-28 sm:w-40 mx-auto mt-1.5 shrink-0">
+                          <div className="text-[10px] sm:text-xs font-semibold tracking-wide text-amber-900/85 mb-1">HP</div>
+                          <div className="h-2 sm:h-2.5 bg-zinc-900/25 border border-amber-900/35 rounded-full overflow-hidden">
+                            <motion.div
+                              className="h-full bg-gradient-to-r from-rose-600 to-red-500"
+                              initial={{ width: '100%' }}
+                              animate={{ width: `${Math.max(0, (cat.hp / cat.maxHp) * 100)}%` }}
+                              transition={{ duration: 0.5 }}
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
