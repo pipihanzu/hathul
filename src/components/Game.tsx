@@ -1,16 +1,10 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Shield, Heart, Sword, Skull, Cat, ArrowRight, Volume2, VolumeX } from 'lucide-react';
 import Dice3D from './Dice3D';
 import { cn } from '../lib/utils';
 
-const MUSIC_TRACKS = ['/sounds/music1.mp3', '/sounds/music2.mp3', '/sounds/music3.mp3', '/sounds/music4.mp3'];
-const END_STAGE_VOLUME_MULTIPLIER = 0.45;
-
-const toMusicGain = (volume: number) => {
-  if (volume <= 0.5) return volume * 0.3;
-  return 0.15 + (volume - 0.5) * 0.7;
-};
+type MusicPlaybackState = 'playing' | 'paused' | 'stopped';
 
 type CatEntity = {
   name: string;
@@ -61,7 +55,19 @@ const GOBLINS: Goblin[] = [
 
 const CAT_NAMES = ["Sir Pounce", "Mittens", "Shadow", "Luna", "Whiskers", "Balthazar", "Meowth", "Professor Fluff"];
 
-export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: () => void; musicVolume: number; setMusicVolume: (value: number) => void; }) {
+export default function Game({
+  onExit,
+  musicVolume,
+  setMusicVolume,
+  musicPlaybackState,
+  setMusicPlaybackState,
+}: {
+  onExit: () => void;
+  musicVolume: number;
+  setMusicVolume: (value: number) => void;
+  musicPlaybackState: MusicPlaybackState;
+  setMusicPlaybackState: (value: MusicPlaybackState) => void;
+}) {
   const [level, setLevel] = useState(1);
   const [cat, setCat] = useState<CatEntity | null>(null);
   const [turn, setTurn] = useState<'player' | 'opponent'>('player');
@@ -81,12 +87,10 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
   const hitAudioRef = useRef<HTMLAudioElement>(null);
   const yourTurnAudioRef = useRef<HTMLAudioElement>(null);
   const goblinTurnAudioRef = useRef<HTMLAudioElement>(null);
-  const musicAudioRef = useRef<HTMLAudioElement>(null);
   const goblinLossAudioRef = useRef<HTMLAudioElement>(null);
   const goblinWinAudioRef = useRef<HTMLAudioElement>(null);
   const catDieAudioRef = useRef<HTMLAudioElement>(null);
   const drinkAudioRef = useRef<HTMLAudioElement>(null);
-  const [musicTrackIndex, setMusicTrackIndex] = useState(() => Math.floor(Math.random() * MUSIC_TRACKS.length));
 
   const [showVolumeModal, setShowVolumeModal] = useState(false);
   // Volume before muting, so we can restore it on unmute
@@ -116,8 +120,6 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
   const SCORE_MISS_BONUS = 8;
   const SCORE_LEVEL_PASS = 70;
   const SCORE_GAME_WIN = 140;
-  const isEndStage = gameState === 'gameOver' || gameState === 'gameWon';
-  const effectiveMusicVolume = isEndStage ? musicVolume * END_STAGE_VOLUME_MULTIPLIER : musicVolume;
 
   const addLog = (text: string, type: 'info' | 'hit' | 'miss' | 'fatal' = 'info') => {
     setLogs(prev => [...prev, { id: logIdRef.current++, text, type }]);
@@ -364,58 +366,6 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
       preMuteVolumeRef.current = musicVolume;
     }
   }, [musicVolume]);
-
-  // Initialize playlist behavior once and continuously advance tracks.
-  useLayoutEffect(() => {
-    const musicEl = musicAudioRef.current;
-    if (!musicEl) return;
-
-    const tryPlay = () => {
-      if (musicVolume <= 0 || !musicAudioRef.current) return;
-      musicAudioRef.current.play().catch(() => {
-        // Autoplay blocked: retry on first explicit interaction.
-        const onUserInteraction = () => {
-          if (musicVolume > 0 && musicAudioRef.current?.paused) {
-            musicAudioRef.current.play().catch(() => {});
-          }
-        };
-        window.addEventListener('pointerdown', onUserInteraction, { once: true });
-        window.addEventListener('keydown', onUserInteraction, { once: true });
-      });
-    };
-
-    musicEl.loop = false;
-    musicEl.volume = toMusicGain(effectiveMusicVolume);
-    musicEl.currentTime = 0;
-
-    const onEnded = () => {
-      setMusicTrackIndex((prev) => (prev + 1) % MUSIC_TRACKS.length);
-    };
-
-    musicEl.addEventListener('ended', onEnded);
-    tryPlay();
-
-    return () => {
-      musicEl.removeEventListener('ended', onEnded);
-    };
-  }, []);
-
-  // Keep music state synchronized with track progression and effective volume.
-  useEffect(() => {
-    const musicEl = musicAudioRef.current;
-    if (!musicEl) return;
-
-    musicEl.volume = toMusicGain(effectiveMusicVolume);
-
-    if (effectiveMusicVolume <= 0) {
-      musicEl.pause();
-      return;
-    }
-
-    if (musicEl.paused) {
-      musicEl.play().catch(() => {});
-    }
-  }, [effectiveMusicVolume, musicTrackIndex]);
 
   const usePotion = (potion: PotionDef) => {
     if (gameState !== 'playing') return;
@@ -812,8 +762,8 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
             className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border border-amber-500 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 transition-colors select-none touch-none"
             title="Adjust music volume"
           >
-            {musicVolume > 0 ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5 opacity-60" />}
-            <span className={musicVolume === 0 ? 'opacity-40' : ''}>{Math.round(musicVolume * 100)}%</span>
+            {musicPlaybackState === 'playing' && musicVolume > 0 ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5 opacity-60" />}
+            <span className={musicPlaybackState !== 'playing' || musicVolume === 0 ? 'opacity-40' : ''}>{Math.round(musicVolume * 100)}%</span>
           </button>
           <button onClick={onExit} className="text-zinc-500 hover:text-zinc-300 text-xs">Flee</button>
         </div>
@@ -1080,7 +1030,18 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
                   min="0"
                   max="100"
                   value={Math.round(musicVolume * 100)}
-                  onChange={(e) => setMusicVolume(parseInt(e.target.value) / 100)}
+                  onChange={(e) => {
+                    const nextVolume = parseInt(e.target.value, 10) / 100;
+                    setMusicVolume(nextVolume);
+                    if (nextVolume > 0) {
+                      preMuteVolumeRef.current = nextVolume;
+                      setMusicPlaybackState('playing');
+                      return;
+                    }
+                    if (musicPlaybackState === 'playing') {
+                      setMusicPlaybackState('paused');
+                    }
+                  }}
                   className="w-full h-3 bg-zinc-700 rounded-full appearance-none cursor-pointer accent-amber-500"
                   style={{
                     WebkitAppearance: 'slider-horizontal',
@@ -1096,15 +1057,61 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
                   if (musicVolume > 0) {
                     preMuteVolumeRef.current = musicVolume;
                     setMusicVolume(0);
+                    if (musicPlaybackState === 'playing') {
+                      setMusicPlaybackState('paused');
+                    }
                     return;
                   }
-                  const restore = preMuteVolumeRef.current > 0 ? preMuteVolumeRef.current : 0.2;
+                  const restore = preMuteVolumeRef.current > 0 ? preMuteVolumeRef.current : 0.5;
                   setMusicVolume(restore);
+                  setMusicPlaybackState('playing');
                 }}
                 className="w-full px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg font-serif text-lg transition-colors"
               >
                 {musicVolume > 0 ? 'Mute' : 'Unmute'}
               </button>
+
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={() => {
+                    if (musicVolume <= 0) {
+                      const restore = preMuteVolumeRef.current > 0 ? preMuteVolumeRef.current : 0.5;
+                      setMusicVolume(restore);
+                    }
+                    setMusicPlaybackState('playing');
+                  }}
+                  className={cn(
+                    'px-4 py-2 rounded-lg font-serif text-sm transition-colors',
+                    musicPlaybackState === 'playing'
+                      ? 'bg-amber-600 text-zinc-950'
+                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200'
+                  )}
+                >
+                  Play
+                </button>
+                <button
+                  onClick={() => setMusicPlaybackState('paused')}
+                  className={cn(
+                    'px-4 py-2 rounded-lg font-serif text-sm transition-colors',
+                    musicPlaybackState === 'paused'
+                      ? 'bg-amber-600 text-zinc-950'
+                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200'
+                  )}
+                >
+                  Pause
+                </button>
+                <button
+                  onClick={() => setMusicPlaybackState('stopped')}
+                  className={cn(
+                    'px-4 py-2 rounded-lg font-serif text-sm transition-colors',
+                    musicPlaybackState === 'stopped'
+                      ? 'bg-amber-600 text-zinc-950'
+                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200'
+                  )}
+                >
+                  Stop
+                </button>
+              </div>
 
               <button
                 onClick={() => setShowVolumeModal(false)}
@@ -1185,7 +1192,6 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
       <audio ref={hitAudioRef} src="/sounds/cathit.wav" preload="auto" />
       <audio ref={yourTurnAudioRef} src="/sounds/yourturn.wav" preload="auto" />
       <audio ref={goblinTurnAudioRef} src="/sounds/goblinturn.wav" preload="auto" />
-      <audio ref={musicAudioRef} src={MUSIC_TRACKS[musicTrackIndex]} preload="auto" />
       <audio ref={goblinLossAudioRef} src="/sounds/goblinloss.wav" preload="auto" />
       <audio ref={goblinWinAudioRef} src="/sounds/goblinwin.wav" preload="auto" />
       <audio ref={catDieAudioRef} src="/sounds/catdie.wav" preload="auto" />

@@ -3,11 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 
 import { ChevronDown, Sword } from 'lucide-react';
 import Game from './components/Game';
+
+const MUSIC_TRACKS = ['/sounds/music1.mp3', '/sounds/music2.mp3', '/sounds/music3.mp3', '/sounds/music4.mp3'];
+type MusicPlaybackState = 'playing' | 'paused' | 'stopped';
 
 type LeaderboardEntry = {
   id: string;
@@ -22,16 +25,32 @@ const SCOREBOARD_CACHE_KEY = 'hathul-scoreboard-cache';
 export default function App() {
   const [gameState, setGameState] = useState<'start' | 'playing'>('start');
   const [musicVolume, setMusicVolume] = useState(() => {
-    if (typeof window === 'undefined') return 0.2;
+    if (typeof window === 'undefined') return 0.5;
     const stored = window.localStorage.getItem('hathul-music-volume');
-    if (stored === null) return 0.2;
+    if (stored === null) return 0.5;
     const parsed = parseFloat(stored);
-    return Number.isFinite(parsed) ? parsed : 0.2;
+    if (!Number.isFinite(parsed)) return 0.5;
+    return Math.min(1, Math.max(0, parsed));
   });
+  const [musicPlaybackState, setMusicPlaybackState] = useState<MusicPlaybackState>(() => {
+    if (typeof window === 'undefined') return 'playing';
+    const stored = window.localStorage.getItem('hathul-music-state');
+    if (stored === 'playing' || stored === 'paused' || stored === 'stopped') {
+      return stored;
+    }
+    return 'playing';
+  });
+  const [musicTrackIndex, setMusicTrackIndex] = useState(() => Math.floor(Math.random() * MUSIC_TRACKS.length));
   const [showScoreboard, setShowScoreboard] = useState(false);
   const [leaderboardEntries, setLeaderboardEntries] = useState<LeaderboardEntry[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
+  const musicAudioRef = useRef<HTMLAudioElement>(null);
+  const shouldTryPlayRef = useRef(false);
+
+  const handleStartGame = () => {
+    setGameState('playing');
+  };
 
   const loadScoreboard = async () => {
     setLeaderboardLoading(true);
@@ -80,11 +99,88 @@ export default function App() {
     window.localStorage.setItem('hathul-music-volume', musicVolume.toString());
   }, [musicVolume]);
 
-  if (gameState === 'playing') {
-    return <Game onExit={() => setGameState('start')} musicVolume={musicVolume} setMusicVolume={setMusicVolume} />;
-  }
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('hathul-music-state', musicPlaybackState);
+  }, [musicPlaybackState]);
+
+  useEffect(() => {
+    const musicEl = musicAudioRef.current;
+    if (!musicEl) return;
+    musicEl.volume = musicVolume;
+  }, [musicVolume]);
+
+  useEffect(() => {
+    const musicEl = musicAudioRef.current;
+    if (!musicEl) return;
+
+    shouldTryPlayRef.current = musicPlaybackState === 'playing';
+
+    if (musicPlaybackState === 'playing') {
+      musicEl.play().catch(() => {
+        // Autoplay may be blocked until user interaction.
+      });
+      return;
+    }
+
+    if (musicPlaybackState === 'paused') {
+      musicEl.pause();
+      return;
+    }
+
+    musicEl.pause();
+    musicEl.currentTime = 0;
+  }, [musicPlaybackState, musicTrackIndex]);
+
+  useEffect(() => {
+    const onUserInteraction = () => {
+      if (!shouldTryPlayRef.current) return;
+      const musicEl = musicAudioRef.current;
+      if (!musicEl) return;
+      musicEl.play().catch(() => {
+        // Ignore; next interaction will retry.
+      });
+    };
+
+    window.addEventListener('pointerdown', onUserInteraction);
+    window.addEventListener('keydown', onUserInteraction);
+    window.addEventListener('touchstart', onUserInteraction, { passive: true });
+
+    return () => {
+      window.removeEventListener('pointerdown', onUserInteraction);
+      window.removeEventListener('keydown', onUserInteraction);
+      window.removeEventListener('touchstart', onUserInteraction);
+    };
+  }, []);
+
+  useEffect(() => {
+    const musicEl = musicAudioRef.current;
+    if (!musicEl) return;
+
+    const onEnded = () => {
+      if (musicPlaybackState !== 'playing') return;
+      setMusicTrackIndex((prev) => (prev + 1) % MUSIC_TRACKS.length);
+    };
+
+    musicEl.addEventListener('ended', onEnded);
+    return () => {
+      musicEl.removeEventListener('ended', onEnded);
+    };
+  }, [musicPlaybackState]);
 
   return (
+    <>
+      <audio ref={musicAudioRef} src={MUSIC_TRACKS[musicTrackIndex]} preload="auto" />
+
+      {gameState === 'playing' ? (
+        <Game
+          onExit={() => setGameState('start')}
+          musicVolume={musicVolume}
+          setMusicVolume={setMusicVolume}
+          musicPlaybackState={musicPlaybackState}
+          setMusicPlaybackState={setMusicPlaybackState}
+        />
+      ) : (
     <div className="min-h-screen bg-zinc-950 text-zinc-200 font-sans overflow-x-hidden">
       {/* Hero Section */}
       <section className="relative min-h-[100svh] flex flex-col items-center justify-center p-6 text-center">
@@ -132,7 +228,7 @@ export default function App() {
             transition={{ duration: 0.8, delay: 0.4 }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => setGameState('playing')}
+            onClick={handleStartGame}
             className="group relative px-8 py-4 bg-zinc-900 border border-amber-900/50 hover:border-amber-500/50 rounded-sm overflow-hidden transition-colors cursor-pointer"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-amber-900/20 via-transparent to-amber-900/20 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -258,5 +354,7 @@ export default function App() {
         </div>
       )}
     </div>
+      )}
+    </>
   );
 }
