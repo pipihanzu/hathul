@@ -760,6 +760,25 @@ export default function Game({
     );
   };
 
+  const applySliderVolume = (rawValue: string) => {
+    const parsed = Number.parseInt(rawValue, 10);
+    if (!Number.isFinite(parsed)) return;
+
+    const clampedPercent = Math.max(0, Math.min(100, parsed));
+    const nextVolume = clampedPercent / 100;
+    setMusicVolume(nextVolume);
+
+    if (nextVolume > 0) {
+      preMuteVolumeRef.current = nextVolume;
+      setMusicPlaybackState('playing');
+      return;
+    }
+
+    if (musicPlaybackState === 'playing') {
+      setMusicPlaybackState('paused');
+    }
+  };
+
   if (!cat) return null;
 
   const currentGoblin = GOBLINS[level - 1];
@@ -1163,19 +1182,10 @@ export default function Game({
                   type="range"
                   min="0"
                   max="100"
+                  step="1"
                   value={Math.round(musicVolume * 100)}
-                  onChange={(e) => {
-                    const nextVolume = parseInt(e.target.value, 10) / 100;
-                    setMusicVolume(nextVolume);
-                    if (nextVolume > 0) {
-                      preMuteVolumeRef.current = nextVolume;
-                      setMusicPlaybackState('playing');
-                      return;
-                    }
-                    if (musicPlaybackState === 'playing') {
-                      setMusicPlaybackState('paused');
-                    }
-                  }}
+                  onInput={(e) => applySliderVolume((e.target as HTMLInputElement).value)}
+                  onChange={(e) => applySliderVolume(e.target.value)}
                   className="w-full h-3 bg-zinc-700 rounded-full appearance-none cursor-pointer accent-amber-500"
                   style={{
                     WebkitAppearance: 'slider-horizontal',
