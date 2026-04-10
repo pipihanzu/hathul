@@ -1111,7 +1111,7 @@ export default function Game({
         </motion.div>
 
         {/* The Cat */}
-        <div className="flex-1 min-h-0 flex flex-col items-center justify-center py-0.5 sm:py-4 relative overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col items-center justify-center py-0.5 sm:py-4 relative overflow-visible sm:overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-amber-900/10 via-transparent to-transparent pointer-events-none" />
           
           <div

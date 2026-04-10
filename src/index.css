@@ -127,20 +127,8 @@ html, body, #root {
   font-family: "Uncial Antiqua", "Cinzel", serif;
 }
 
-@media (max-width: 640px) and (max-height: 860px) {
+@media (max-width: 640px) {
   .cat-card-mobile-fit {
-    transform: scale(0.9);
-  }
-}
-
-@media (max-width: 640px) and (max-height: 760px) {
-  .cat-card-mobile-fit {
-    transform: scale(0.8);
-  }
-}
-
-@media (max-width: 390px) and (max-height: 720px) {
-  .cat-card-mobile-fit {
-    transform: scale(0.74);
+    transform: scale(1.25);
   }
 }
