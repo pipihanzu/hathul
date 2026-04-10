@@ -92,15 +92,18 @@ export default function Game({
   const [rollPhase, setRollPhase] = useState<'idle' | 'd20' | 'waiting-d6' | 'd6'>('idle');
   const [rollResult, setRollResult] = useState<number | null>(null);
   const [damageResult, setDamageResult] = useState<number | null>(null);
+  const [isWaitingDamageD20Faded, setIsWaitingDamageD20Faded] = useState(false);
   const [isCriticalHit, setIsCriticalHit] = useState(false);
   const [isWaitingForNextTurn, setIsWaitingForNextTurn] = useState(false);
   
   const [logs, setLogs] = useState<{ id: number; text: string; type: 'info' | 'hit' | 'miss' | 'fatal' }[]>([]);
+  const [isLogVisible, setIsLogVisible] = useState(false);
   const logIdRef = useRef(0);
   const logContainerRef = useRef<HTMLDivElement>(null);
   const diceRollAudioRef = useRef<HTMLAudioElement>(null);
   const missAudioRef = useRef<HTMLAudioElement>(null);
   const hitAudioRef = useRef<HTMLAudioElement>(null);
+  const swordHitAudioRef = useRef<HTMLAudioElement>(null);
   const yourTurnAudioRef = useRef<HTMLAudioElement>(null);
   const goblinTurnAudioRef = useRef<HTMLAudioElement>(null);
   const goblinLossAudioRef = useRef<HTMLAudioElement>(null);
@@ -165,6 +168,7 @@ export default function Game({
       diceRollAudioRef,
       missAudioRef,
       hitAudioRef,
+      swordHitAudioRef,
       yourTurnAudioRef,
       goblinTurnAudioRef,
       goblinLossAudioRef,
@@ -441,6 +445,26 @@ export default function Game({
     }
   }, [musicVolume]);
 
+  useEffect(() => {
+    const shouldDelayFade =
+      gameState === 'playing' &&
+      turn === 'player' &&
+      rollPhase === 'waiting-d6' &&
+      rollResult !== null;
+
+    if (!shouldDelayFade) {
+      setIsWaitingDamageD20Faded(false);
+      return;
+    }
+
+    setIsWaitingDamageD20Faded(false);
+    const timer = window.setTimeout(() => {
+      setIsWaitingDamageD20Faded(true);
+    }, 3000);
+
+    return () => window.clearTimeout(timer);
+  }, [gameState, turn, rollPhase, rollResult]);
+
   const usePotion = (potion: PotionDef) => {
     if (gameState !== 'playing') return;
 
@@ -551,6 +575,10 @@ export default function Game({
       if (hit) {
         triggerCatEdgeHitFlash();
         triggerCatHitShake();
+        if (swordHitAudioRef.current) {
+          swordHitAudioRef.current.currentTime = 0;
+          swordHitAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
+        }
         addLog(`Hit!`, 'hit');
         
         if (turn === 'player') {
@@ -874,13 +902,19 @@ export default function Game({
         />
       {/* 3D Dice Overlay */}
       {rollPhase !== 'idle' && (
-        <Dice3D 
-          rolling={rollResult === null} 
-          result={rollResult} 
-          roller={turn} 
-          type={rollPhase === 'waiting-d6' ? 'd20' : rollPhase}
-          onRollComplete={onRollComplete} 
-        />
+        <motion.div
+          className="absolute inset-0 z-50 pointer-events-none"
+          animate={{ opacity: isWaitingDamageD20Faded ? 0 : 1 }}
+          transition={{ duration: 0.45, ease: 'easeOut' }}
+        >
+          <Dice3D
+            rolling={rollResult === null}
+            result={rollResult}
+            roller={turn}
+            type={rollPhase === 'waiting-d6' ? 'd20' : rollPhase}
+            onRollComplete={onRollComplete}
+          />
+        </motion.div>
       )}
 
       <AnimatePresence>
@@ -1106,12 +1140,12 @@ export default function Game({
 
                       <div className="text-center space-y-1 sm:space-y-2 w-full">
                         <div className="flex items-center justify-center" title="Armor Class">
-                          <div className="inline-flex items-center gap-2 rounded-full border border-amber-800/30 bg-amber-100/40 px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-[0_4px_14px_rgba(120,53,15,0.12)] backdrop-blur-sm">
-                            <div className="relative flex h-7 w-6 min-[380px]:h-8 min-[380px]:w-7 sm:h-10 sm:w-8 items-center justify-center shrink-0">
+                          <div className="inline-flex items-center gap-3 rounded-full border border-amber-800/30 bg-amber-100/40 px-4 py-2 sm:px-5 sm:py-3 shadow-[0_4px_14px_rgba(120,53,15,0.12)] backdrop-blur-sm">
+                            <div className="relative flex h-10 w-9 min-[380px]:h-12 min-[380px]:w-10 sm:h-14 sm:w-12 items-center justify-center shrink-0">
                               <Shield className="absolute inset-0 h-full w-full fill-amber-300/20 text-amber-600" strokeWidth={1.8} />
-                              <span className="relative pt-0.5 text-[11px] min-[380px]:text-sm sm:text-base font-black text-amber-950">{cat.ac}</span>
+                              <span className="relative pt-0.5 text-[17px] min-[380px]:text-[21px] sm:text-2xl font-black text-amber-950">{cat.ac}</span>
                             </div>
-                            <span className="text-[11px] min-[380px]:text-sm sm:text-base font-black uppercase tracking-[0.14em] text-amber-900">AC</span>
+                            <span className="text-[17px] min-[380px]:text-[21px] sm:text-2xl font-black uppercase tracking-[0.14em] text-amber-900">AC</span>
                           </div>
                         </div>
                         <h2 className="text-base min-[380px]:text-lg sm:text-[1.6rem] font-serif font-black tracking-[0.01em] text-amber-950">{cat.name}</h2>
@@ -1227,7 +1261,16 @@ export default function Game({
               {turn === 'player' && <span className="text-[10px] font-bold text-amber-500 animate-pulse mb-0.5">YOUR TURN</span>}
             </div>
             
-            <div className="ml-auto shrink-0">
+            <div className="ml-auto shrink-0 flex items-center gap-2">
+              <button
+                onClick={() => setIsLogVisible((prev) => !prev)}
+                className="text-[10px] sm:text-xs px-2 py-1 rounded border border-zinc-700 bg-zinc-900/80 text-zinc-300 hover:text-zinc-100 hover:border-zinc-500 transition-colors"
+                aria-expanded={isLogVisible}
+                aria-controls="combat-log-panel"
+                title={isLogVisible ? 'Hide combat log' : 'Show combat log'}
+              >
+                {isLogVisible ? 'Hide Log' : 'Show Log'}
+              </button>
               <button
                 onClick={handleRoll}
                 disabled={turn !== 'player' || (rollPhase !== 'idle' && rollPhase !== 'waiting-d6') || gameState !== 'playing' || isWaitingForNextTurn}
@@ -1246,19 +1289,25 @@ export default function Game({
         </div>
 
         {/* Combat Log */}
-        <div ref={logContainerRef} className="h-20 sm:h-24 shrink-0 bg-zinc-900/80 border border-zinc-800 rounded-lg p-2 overflow-y-auto font-mono text-xs">
-          {logs.map((log) => (
-            <div key={log.id} className={cn(
-              "mb-0.5",
-              log.type === 'hit' && "text-red-400",
-              log.type === 'miss' && "text-zinc-500",
-              log.type === 'fatal' && "text-red-500 font-bold",
-              log.type === 'info' && "text-amber-200/70"
-            )}>
-              {log.text}
-            </div>
-          ))}
-        </div>
+        {isLogVisible && (
+          <div
+            id="combat-log-panel"
+            ref={logContainerRef}
+            className="h-20 sm:h-24 shrink-0 bg-zinc-900/80 border border-zinc-800 rounded-lg p-2 overflow-y-auto font-mono text-xs"
+          >
+            {logs.map((log) => (
+              <div key={log.id} className={cn(
+                "mb-0.5",
+                log.type === 'hit' && "text-red-400",
+                log.type === 'miss' && "text-zinc-500",
+                log.type === 'fatal' && "text-red-500 font-bold",
+                log.type === 'info' && "text-amber-200/70"
+              )}>
+                {log.text}
+              </div>
+            ))}
+          </div>
+        )}
 
       </main>
 
@@ -1466,6 +1515,7 @@ export default function Game({
       <audio ref={diceRollAudioRef} src="/sounds/diceroll.wav" preload="auto" />
       <audio ref={missAudioRef} src="/sounds/miss.wav" preload="auto" />
       <audio ref={hitAudioRef} src="/sounds/cathit.wav" preload="auto" />
+      <audio ref={swordHitAudioRef} src="/sounds/swordhit.wav" preload="auto" />
       <audio ref={yourTurnAudioRef} src="/sounds/yourturn.wav" preload="auto" />
       <audio ref={goblinTurnAudioRef} src="/sounds/goblinturn.wav" preload="auto" />
       <audio ref={goblinLossAudioRef} src="/sounds/goblinloss.wav" preload="auto" />
