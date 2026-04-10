@@ -107,6 +107,12 @@ const GameDice: React.FC<DiceProps> = ({ rolling, result, roller, type = 'd20', 
   useFrame((state, delta) => {
     if (!meshRef.current) return;
 
+    // Keep the dice body inside the visible camera frustum on any screen size.
+    const diceRadius = 0.45;
+    const boundsX = Math.max(0.75, (state.viewport.width / 2) - diceRadius);
+    const boundsY = Math.max(0.75, (state.viewport.height / 2) - diceRadius);
+    const boundsZ = 1.5;
+
     if (rolling) {
       // Spin wildly
       meshRef.current.rotation.x += delta * 15;
@@ -116,10 +122,6 @@ const GameDice: React.FC<DiceProps> = ({ rolling, result, roller, type = 'd20', 
       // Gravity and movement
       vel.current.y -= delta * 25; // gravity
       pos.current.addScaledVector(vel.current, delta);
-      
-      const boundsX = 2.5; 
-      const boundsY = 2.5;
-      const boundsZ = 1.5;
       
       // Floor bounce (with random deflection for erratic bouncing)
       if (pos.current.y < -boundsY) { 
@@ -144,9 +146,11 @@ const GameDice: React.FC<DiceProps> = ({ rolling, result, roller, type = 'd20', 
       // Smoothly interpolate to target rotation
       meshRef.current.quaternion.slerp(targetQuaternion, delta * 10);
       
-      // Settle 100px below vertical center while keeping horizontal center.
+      // Settle below center while clamping to viewport so it remains visible on mobile.
       const worldUnitsPerPixel = state.viewport.height / state.size.height;
-      const targetY = -200 * worldUnitsPerPixel;
+      const settlePixels = Math.min(200, state.size.height * 0.22);
+      const unclampedTargetY = -settlePixels * worldUnitsPerPixel;
+      const targetY = THREE.MathUtils.clamp(unclampedTargetY, -boundsY + 0.2, boundsY - 0.2);
       meshRef.current.position.lerp(new THREE.Vector3(0, targetY, 0), delta * 5);
     }
   });

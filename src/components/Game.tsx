@@ -55,6 +55,17 @@ const GOBLINS: Goblin[] = [
 
 const CAT_NAMES = ["Sir Pounce", "Mittens", "Shadow", "Luna", "Whiskers", "Balthazar", "Meowth", "Professor Fluff"];
 
+const LEVEL_CLEARED_COMMENTS: Record<number, string> = {
+  1: "The Goblin Runt did the dirty work. Your hands stay clean, your conscience stays negotiable.",
+  2: "The Scrapper carved up the cat while you supervised like a true villainous intern.",
+  3: "The Brawler solved the problem with blunt force and zero emotional development.",
+  4: "The Hunter tracked your target, then your morals, then misplaced both.",
+  5: "The Shaman called it a ritual. Historians will probably call it paperwork.",
+  6: "The Chieftain delivered justice, goblin-style: loud, messy, and legally unreviewed.",
+  7: "The Warlord salutes your leadership. HR has several concerns.",
+  8: "The Emperor handled the cat and promoted you from survivor to accessories-to-crime.",
+};
+
 export default function Game({
   onExit,
   musicVolume,
@@ -114,6 +125,11 @@ export default function Game({
   const [critRollIndicator, setCritRollIndicator] = useState<{ id: number; text: string; tone: 'hit' | 'miss' } | null>(null);
   const critRollIndicatorIdRef = useRef(0);
   const critRollTimeoutRef = useRef<number | null>(null);
+  const [turnPulse, setTurnPulse] = useState<{ target: 'player' | 'opponent'; id: number } | null>(null);
+  const turnPulseIdRef = useRef(0);
+  const turnPulseTimeoutRef = useRef<number | null>(null);
+  const [isCatHitShaking, setIsCatHitShaking] = useState(false);
+  const catHitShakeTimeoutRef = useRef<number | null>(null);
 
   const SCORE_BASE_ROLL = 10;
   const SCORE_CRITICAL_ROLL = 30;
@@ -225,8 +241,50 @@ export default function Game({
       if (critRollTimeoutRef.current !== null) {
         window.clearTimeout(critRollTimeoutRef.current);
       }
+      if (turnPulseTimeoutRef.current !== null) {
+        window.clearTimeout(turnPulseTimeoutRef.current);
+      }
+      if (catHitShakeTimeoutRef.current !== null) {
+        window.clearTimeout(catHitShakeTimeoutRef.current);
+      }
     };
   }, []);
+
+  const triggerCatHitShake = () => {
+    setIsCatHitShaking(false);
+    requestAnimationFrame(() => {
+      setIsCatHitShaking(true);
+      if (catHitShakeTimeoutRef.current !== null) {
+        window.clearTimeout(catHitShakeTimeoutRef.current);
+      }
+      catHitShakeTimeoutRef.current = window.setTimeout(() => {
+        setIsCatHitShaking(false);
+        catHitShakeTimeoutRef.current = null;
+      }, 280);
+    });
+  };
+
+  useEffect(() => {
+    if (damageResult === null) return;
+
+    triggerCatHitShake();
+  }, [damageResult]);
+
+  useEffect(() => {
+    if (gameState !== 'playing' || !cat) return;
+
+    const pulseId = turnPulseIdRef.current++;
+    setTurnPulse({ target: turn, id: pulseId });
+
+    if (turnPulseTimeoutRef.current !== null) {
+      window.clearTimeout(turnPulseTimeoutRef.current);
+    }
+
+    turnPulseTimeoutRef.current = window.setTimeout(() => {
+      setTurnPulse((current) => (current?.id === pulseId ? null : current));
+      turnPulseTimeoutRef.current = null;
+    }, 2000);
+  }, [turn, gameState, cat]);
 
   const startLevel = (lvl: number) => {
     const newCat: CatEntity = {
@@ -468,6 +526,7 @@ export default function Game({
       }
 
       if (hit) {
+        triggerCatHitShake();
         addLog(`Hit!`, 'hit');
         
         // Play hit sound
@@ -706,6 +765,9 @@ export default function Game({
   const currentGoblin = GOBLINS[level - 1];
   const maxCaveIndex = 6;
   const caveImage = `cave${Math.min(level, maxCaveIndex)}`;
+  const isOpponentPulseActive = turnPulse?.target === 'opponent';
+  const isPlayerPulseActive = turnPulse?.target === 'player';
+  const levelClearedComment = LEVEL_CLEARED_COMMENTS[level] || "The goblin handled the cat. Fate handled your soul.";
 
   return (
     <div className="h-[100dvh] w-full bg-zinc-950 text-zinc-200 font-sans relative overflow-hidden">
@@ -739,7 +801,7 @@ export default function Game({
               className={cn(
                 "px-4 py-2 rounded-xl border-2 font-black font-serif tracking-wide text-lg sm:text-xl whitespace-nowrap shadow-2xl",
                 critRollIndicator.tone === 'hit'
-                  ? "text-amber-100 bg-amber-900/90 border-amber-300/80"
+                  ? "text-red-100 bg-red-900/90 border-red-300/80"
                   : "text-red-100 bg-red-900/90 border-red-300/80"
               )}
             >
@@ -814,10 +876,53 @@ export default function Game({
       <main className="flex-1 min-h-0 flex flex-col p-2 gap-2 sm:gap-4 w-full z-10">
         
         {/* Opponent Area */}
-        <div className={cn(
-          "shrink-0 p-3 sm:p-4 rounded-2xl border-2 transition-all duration-500 flex items-center gap-4 relative overflow-hidden min-h-[110px]",
-          turn === 'opponent' ? "border-amber-400 bg-amber-950/40 shadow-[0_0_30px_rgba(245,158,11,0.25)] scale-[1.01]" : "border-zinc-700 bg-zinc-900/70"
-        )}>
+        <motion.div
+          animate={
+            isOpponentPulseActive
+              ? {
+                  opacity: [1, 0.45, 1, 0.45, 1],
+                  scale: [1.01, 1.06, 1.01, 1.06, 1.01],
+                  boxShadow: [
+                    '0 0 22px rgba(245,158,11,0.26), 0 0 36px rgba(245,158,11,0.16), inset 0 0 0 rgba(251,191,36,0)',
+                    '0 0 40px rgba(251,191,36,0.72), 0 0 82px rgba(245,158,11,0.5), inset 0 0 24px rgba(254,240,138,0.24)',
+                    '0 0 22px rgba(245,158,11,0.26), 0 0 36px rgba(245,158,11,0.16), inset 0 0 0 rgba(251,191,36,0)',
+                    '0 0 40px rgba(251,191,36,0.72), 0 0 82px rgba(245,158,11,0.5), inset 0 0 24px rgba(254,240,138,0.24)',
+                    '0 0 22px rgba(245,158,11,0.26), 0 0 36px rgba(245,158,11,0.16), inset 0 0 0 rgba(251,191,36,0)',
+                  ],
+                  filter: ['brightness(1)', 'brightness(1.2)', 'brightness(1)', 'brightness(1.2)', 'brightness(1)'],
+                }
+              : {
+                  opacity: 1,
+                  scale: turn === 'opponent' ? 1.01 : 1,
+                  boxShadow: turn === 'opponent'
+                    ? '0 0 30px rgba(245,158,11,0.25)'
+                    : '0 0 0 rgba(0,0,0,0)',
+                  filter: 'brightness(1)',
+                }
+          }
+          transition={isOpponentPulseActive ? { duration: 2, ease: 'easeInOut', times: [0, 0.25, 0.5, 0.75, 1] } : { duration: 0.25, ease: 'easeOut' }}
+          className={cn(
+            "shrink-0 p-3 sm:p-4 rounded-2xl border-2 transition-all duration-500 flex items-center gap-4 relative overflow-hidden min-h-[110px]",
+            turn === 'opponent' ? "border-amber-400 bg-amber-950/40" : "border-zinc-700 bg-zinc-900/70"
+          )}
+        >
+          <motion.div
+            aria-hidden
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: 'radial-gradient(120% 180% at 50% 50%, rgba(251,191,36,0.35) 0%, rgba(251,191,36,0.08) 42%, rgba(0,0,0,0) 72%), linear-gradient(120deg, rgba(252,211,77,0) 0%, rgba(252,211,77,0.35) 45%, rgba(252,211,77,0) 70%)',
+              mixBlendMode: 'screen',
+            }}
+            animate={isOpponentPulseActive ? { opacity: [0.2, 0.82, 0.26, 0.82, 0.2], x: ['-14%', '14%', '-8%', '12%', '0%'] } : { opacity: 0, x: '0%' }}
+            transition={isOpponentPulseActive ? { duration: 2, ease: 'easeInOut' } : { duration: 0.25 }}
+          />
+          <motion.div
+            aria-hidden
+            className="absolute -inset-y-10 -left-20 w-24 pointer-events-none blur-xl"
+            style={{ background: 'linear-gradient(90deg, rgba(251,191,36,0) 0%, rgba(253,230,138,0.9) 50%, rgba(251,191,36,0) 100%)', mixBlendMode: 'screen' }}
+            animate={isOpponentPulseActive ? { x: ['0%', '430%'], opacity: [0, 0.95, 0] } : { x: '0%', opacity: 0 }}
+            transition={isOpponentPulseActive ? { duration: 2, ease: 'easeInOut' } : { duration: 0.2 }}
+          />
           {turn === 'opponent' && <div className="absolute top-0 left-0 w-1.5 h-full bg-amber-400" />}
           <div className="w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center shrink-0">
             <img 
@@ -840,34 +945,20 @@ export default function Game({
               </div>
             )}
           </div>
-        </div>
+        </motion.div>
 
         {/* The Cat */}
         <div className="flex-1 min-h-0 flex flex-col items-center justify-center py-1 sm:py-4 relative">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-amber-900/10 via-transparent to-transparent pointer-events-none" />
           
-          <motion.div 
-            animate={{ y: [0, -5, 0], rotateX: [2, 3, 2], rotateY: [-1, 1, -1], z: [22, 26, 22] }}
-            whileHover={{
-              x: [0, -6, 4, -9, 7, -3, 0],
-              rotateX: [2, 10, -4, 12, -7, 5, 2],
-              rotateY: [-1, -15, 8, 13, -11, 6, -1],
-            }}
-            transition={{ repeat: Infinity, duration: 5.8, ease: "easeInOut", times: [0, 0.14, 0.29, 0.47, 0.68, 0.86, 1] }}
-            className="bg-zinc-900/95 rounded-2xl shadow-2xl p-4 transform-gpu"
-            style={{ perspective: 1300, transformStyle: 'preserve-3d', transformOrigin: '50% 50%' }}
+          <div
+            className={cn(
+              "bg-zinc-900/95 rounded-2xl shadow-2xl p-4 transform-gpu",
+              isCatHitShaking && 'cat-hit-shake'
+            )}
+            style={{ perspective: 1200, transformStyle: 'preserve-3d', transformOrigin: '50% 50%' }}
           >
-            <motion.div 
-              key={cat.name}
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ 
-                scale: 1, 
-                opacity: 1,
-                x: damageResult !== null ? [-5, 5, -5, 5, 0] : 0
-              }}
-              transition={{ duration: damageResult !== null ? 0.4 : 0.3 }}
-              className="flex flex-col items-center gap-2 sm:gap-3"
-            >
+            <div className="flex flex-col items-center gap-2 sm:gap-3">
               <div className="relative">
                 <div
                   className="w-32 h-32 sm:w-36 sm:h-36 rounded-2xl bg-zinc-900/80 shadow-2xl transform-gpu rotate-1 transition-transform duration-700 flex items-center justify-center overflow-hidden"
@@ -894,7 +985,7 @@ export default function Game({
                       className={cn(
                         "absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-xl border font-black font-serif tracking-wide drop-shadow-2xl whitespace-nowrap pointer-events-none z-20",
                         isCriticalHit
-                          ? "text-amber-100 text-2xl sm:text-3xl bg-amber-900/90 border-amber-300/80 shadow-[0_0_24px_rgba(245,158,11,0.45)]"
+                          ? "text-red-100 text-2xl sm:text-3xl bg-red-900/90 border-red-300/80 shadow-[0_0_24px_rgba(239,68,68,0.45)]"
                           : "text-red-100 text-xl sm:text-2xl bg-red-900/85 border-red-300/70"
                       )}
                     >
@@ -926,8 +1017,8 @@ export default function Game({
                   />
                 </div>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         </div>
 
         {/* Player Area Container */}
@@ -960,10 +1051,53 @@ export default function Game({
           </div>
 
           {/* Player Box */}
-          <div className={cn(
-            "p-2 sm:p-3 rounded-lg border transition-all duration-500 flex items-center gap-3 relative overflow-hidden",
-            turn === 'player' ? "border-amber-500 bg-amber-950/30 shadow-[0_0_15px_rgba(245,158,11,0.2)] scale-[1.02]" : "border-zinc-800 bg-zinc-900/50 opacity-60"
-          )}>
+          <motion.div
+            animate={
+              isPlayerPulseActive
+                ? {
+                    opacity: [1, 0.45, 1, 0.45, 1],
+                    scale: [1.02, 1.07, 1.02, 1.07, 1.02],
+                    boxShadow: [
+                      '0 0 14px rgba(245,158,11,0.22), 0 0 24px rgba(245,158,11,0.14), inset 0 0 0 rgba(251,191,36,0)',
+                      '0 0 32px rgba(251,191,36,0.7), 0 0 64px rgba(245,158,11,0.45), inset 0 0 20px rgba(254,240,138,0.25)',
+                      '0 0 14px rgba(245,158,11,0.22), 0 0 24px rgba(245,158,11,0.14), inset 0 0 0 rgba(251,191,36,0)',
+                      '0 0 32px rgba(251,191,36,0.7), 0 0 64px rgba(245,158,11,0.45), inset 0 0 20px rgba(254,240,138,0.25)',
+                      '0 0 14px rgba(245,158,11,0.22), 0 0 24px rgba(245,158,11,0.14), inset 0 0 0 rgba(251,191,36,0)',
+                    ],
+                    filter: ['brightness(1)', 'brightness(1.2)', 'brightness(1)', 'brightness(1.2)', 'brightness(1)'],
+                  }
+                : {
+                    opacity: turn === 'player' ? 1 : 0.6,
+                    scale: turn === 'player' ? 1.02 : 1,
+                    boxShadow: turn === 'player'
+                      ? '0 0 15px rgba(245,158,11,0.2)'
+                      : '0 0 0 rgba(0,0,0,0)',
+                    filter: 'brightness(1)',
+                  }
+            }
+            transition={isPlayerPulseActive ? { duration: 2, ease: 'easeInOut', times: [0, 0.25, 0.5, 0.75, 1] } : { duration: 0.25, ease: 'easeOut' }}
+            className={cn(
+              "p-2 sm:p-3 rounded-lg border transition-all duration-500 flex items-center gap-3 relative overflow-hidden",
+              turn === 'player' ? "border-amber-500 bg-amber-950/30" : "border-zinc-800 bg-zinc-900/50"
+            )}
+          >
+            <motion.div
+              aria-hidden
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background: 'radial-gradient(120% 180% at 50% 50%, rgba(251,191,36,0.32) 0%, rgba(251,191,36,0.07) 42%, rgba(0,0,0,0) 72%), linear-gradient(120deg, rgba(252,211,77,0) 0%, rgba(252,211,77,0.35) 45%, rgba(252,211,77,0) 70%)',
+                mixBlendMode: 'screen',
+              }}
+              animate={isPlayerPulseActive ? { opacity: [0.2, 0.82, 0.26, 0.82, 0.2], x: ['-14%', '14%', '-8%', '12%', '0%'] } : { opacity: 0, x: '0%' }}
+              transition={isPlayerPulseActive ? { duration: 2, ease: 'easeInOut' } : { duration: 0.25 }}
+            />
+            <motion.div
+              aria-hidden
+              className="absolute -inset-y-8 -left-20 w-20 pointer-events-none blur-lg"
+              style={{ background: 'linear-gradient(90deg, rgba(251,191,36,0) 0%, rgba(253,230,138,0.92) 50%, rgba(251,191,36,0) 100%)', mixBlendMode: 'screen' }}
+              animate={isPlayerPulseActive ? { x: ['0%', '520%'], opacity: [0, 0.95, 0] } : { x: '0%', opacity: 0 }}
+              transition={isPlayerPulseActive ? { duration: 2, ease: 'easeInOut' } : { duration: 0.2 }}
+            />
             {turn === 'player' && <div className="absolute top-0 left-0 w-1 h-full bg-amber-500" />}
             
             <div className="flex-1 flex flex-col justify-center">
@@ -985,7 +1119,7 @@ export default function Game({
                 {rollPhase === 'waiting-d6' ? 'Roll Damage' : 'Roll to Hit'}
               </button>
             </div>
-          </div>
+          </motion.div>
         </div>
 
         {/* Combat Log */}
@@ -1137,14 +1271,21 @@ export default function Game({
               className="absolute inset-0 bg-center bg-cover"
               style={{ backgroundImage: `url('/images/elements/caves/${caveImage}.png')` }}
             />
-            <div className="absolute inset-0 bg-zinc-950/28 backdrop-blur-[1px]" />
+            <div className="absolute inset-0 bg-zinc-950/60 backdrop-blur-[5px]" />
 
-            <div className="relative z-10 max-w-md w-full space-y-8">
+            <div
+              className={cn(
+                'relative z-10 w-full',
+                gameState === 'levelComplete'
+                  ? 'max-w-5xl h-full py-4 sm:py-6 flex flex-col items-center justify-between gap-4 sm:gap-6'
+                  : 'max-w-md space-y-8'
+              )}
+            >
               {gameState === 'gameOver' && (
                 <>
-                  <h2 className="text-5xl font-serif text-red-500">You Lose</h2>
+                  <h2 className="font-rpg text-5xl sm:text-6xl font-black text-red-500 drop-shadow-[0_6px_18px_rgba(239,68,68,0.35)]">You Lose</h2>
                   <div className="flex justify-center my-6">
-                    <div className="w-32 h-32 rounded-full overflow-hidden flex items-center justify-center border-4 border-red-900/50">
+                    <div className="w-32 h-32 rounded-full overflow-hidden flex items-center justify-center">
                       <img 
                         src={`/images/cats/cat_${level}.png`} 
                         alt={cat.name}
@@ -1153,9 +1294,11 @@ export default function Game({
                       />
                     </div>
                   </div>
-                  <p className="text-zinc-400">You killed {cat.name}. The guilt is unbearable.</p>
+                  <p className="font-serif text-red-100 text-lg sm:text-2xl font-bold leading-relaxed tracking-wide bg-red-950/55 border border-red-400/55 rounded-xl px-4 py-3 shadow-[0_0_28px_rgba(239,68,68,0.3)]">
+                    You killed {cat.name}. The guilt is unbearable.
+                  </p>
                   {renderLeaderboardPanel()}
-                  <button onClick={onExit} className="px-8 py-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-sm font-serif text-xl w-full transition-colors">
+                  <button onClick={onExit} className="px-8 py-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-sm font-rpg font-black text-2xl w-full transition-colors">
                     Main Menu
                   </button>
                 </>
@@ -1163,9 +1306,28 @@ export default function Game({
               
               {gameState === 'levelComplete' && (
                 <>
-                  <h2 className="text-5xl font-serif text-amber-500">Level Cleared</h2>
-                  <p className="text-zinc-400">{GOBLINS[level - 1].name} killed {cat.name}. You are safe... for now.</p>
-                  <button onClick={() => startLevel(level + 1)} className="px-8 py-4 bg-amber-600 hover:bg-amber-500 text-zinc-950 rounded-sm font-serif text-xl w-full transition-colors flex items-center justify-center gap-2">
+                  <div className="w-full flex items-center justify-center text-amber-200/85 font-serif tracking-[0.22em] uppercase text-xs sm:text-sm">
+                    Chapter {level} Chronicle Updated
+                  </div>
+
+                  <div className="w-full flex-1 min-h-0 flex items-center justify-center">
+                    <img
+                      src="/images/elements/levelcleared.png"
+                      alt="Level Cleared"
+                      className="w-auto h-[56dvh] sm:h-[62dvh] max-h-[70vh] object-contain drop-shadow-[0_24px_64px_rgba(245,158,11,0.45)]"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+
+                  <div className="w-full max-w-3xl rounded-2xl border border-amber-300/35 bg-gradient-to-b from-zinc-900/88 via-zinc-900/84 to-zinc-950/92 backdrop-blur-md px-4 py-4 sm:px-7 sm:py-6 shadow-[0_20px_80px_rgba(0,0,0,0.5)]">
+                    <h2 className="font-rpg text-5xl sm:text-7xl font-black text-amber-300 leading-none tracking-wide drop-shadow-[0_6px_18px_rgba(251,191,36,0.35)]">Level Cleared</h2>
+                    <div className="mt-3 h-px w-full bg-gradient-to-r from-transparent via-amber-300/50 to-transparent" />
+                    <p className="font-serif mt-4 text-zinc-100 text-base sm:text-xl leading-relaxed tracking-normal">
+                      {GOBLINS[level - 1].name} killed {cat.name}. {levelClearedComment}
+                    </p>
+                  </div>
+
+                  <button onClick={() => startLevel(level + 1)} className="w-full max-w-xl px-8 py-4 bg-amber-600 hover:bg-amber-500 text-zinc-950 rounded-sm font-rpg font-black text-2xl transition-colors flex items-center justify-center gap-2 shadow-[0_12px_38px_rgba(245,158,11,0.35)]">
                     Next Level <ArrowRight className="w-5 h-5" />
                   </button>
                 </>
