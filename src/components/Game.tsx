@@ -4,6 +4,14 @@ import { Shield, Heart, Sword, Skull, Cat, ArrowRight, Volume2, VolumeX } from '
 import Dice3D from './Dice3D';
 import { cn } from '../lib/utils';
 
+const MUSIC_TRACKS = ['/sounds/music1.mp3', '/sounds/music2.mp3', '/sounds/music3.mp3', '/sounds/music4.mp3'];
+const END_STAGE_VOLUME_MULTIPLIER = 0.45;
+
+const toMusicGain = (volume: number) => {
+  if (volume <= 0.5) return volume * 0.3;
+  return 0.15 + (volume - 0.5) * 0.7;
+};
+
 type CatEntity = {
   name: string;
   hp: number;
@@ -78,15 +86,9 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
   const goblinWinAudioRef = useRef<HTMLAudioElement>(null);
   const catDieAudioRef = useRef<HTMLAudioElement>(null);
   const drinkAudioRef = useRef<HTMLAudioElement>(null);
+  const [musicTrackIndex, setMusicTrackIndex] = useState(() => Math.floor(Math.random() * MUSIC_TRACKS.length));
 
-  const [musicEnabled, setMusicEnabled] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    const stored = window.localStorage.getItem('hathul-music-enabled');
-    return stored === null ? true : stored === 'true';
-  });
   const [showVolumeModal, setShowVolumeModal] = useState(false);
-  const longPressTimerRef = useRef<number | null>(null);
-  const longPressTriggeredRef = useRef(false);
   // Volume before muting, so we can restore it on unmute
   const preMuteVolumeRef = useRef(musicVolume);
 
@@ -102,15 +104,6 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
   const [leaderboardMessage, setLeaderboardMessage] = useState<string | null>(null);
   const [leaderboardRank, setLeaderboardRank] = useState<number | null>(null);
   const hasCheckedLeaderboardRef = useRef(false);
-  const [gameMusicSrc, setGameMusicSrc] = useState(() => {
-    const tracks = ['/sounds/music1.mp3', '/sounds/music2.mp3', '/sounds/music3.mp3', '/sounds/music4.mp3'];
-    return tracks[Math.floor(Math.random() * tracks.length)];
-  });
-
-  const getRandomTrack = () => {
-    const tracks = ['/sounds/music1.mp3', '/sounds/music2.mp3', '/sounds/music3.mp3', '/sounds/music4.mp3'];
-    return tracks[Math.floor(Math.random() * tracks.length)];
-  };
   const [potionPreview, setPotionPreview] = useState<{ id: number; icon: string; name: string; desc: string } | null>(null);
   const potionPreviewIdRef = useRef(0);
   const potionPreviewTimeoutRef = useRef<number | null>(null);
@@ -120,6 +113,8 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
   const SCORE_MISS_BONUS = 8;
   const SCORE_LEVEL_PASS = 70;
   const SCORE_GAME_WIN = 140;
+  const isEndStage = gameState === 'gameOver' || gameState === 'gameWon';
+  const effectiveMusicVolume = isEndStage ? musicVolume * END_STAGE_VOLUME_MULTIPLIER : musicVolume;
 
   const addLog = (text: string, type: 'info' | 'hit' | 'miss' | 'fatal' = 'info') => {
     setLogs(prev => [...prev, { id: logIdRef.current++, text, type }]);
@@ -144,7 +139,6 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
       hitAudioRef,
       yourTurnAudioRef,
       goblinTurnAudioRef,
-      musicAudioRef,
       goblinLossAudioRef,
       goblinWinAudioRef,
       drinkAudioRef,
@@ -250,8 +244,6 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
     setLeaderboardRank(null);
     hasCheckedLeaderboardRef.current = false;
     
-    setGameMusicSrc(getRandomTrack());
-    
     const numPotions = Math.min(6, lvl + 1);
     setAvailablePotions(POTIONS_DB.slice(0, numPotions));
     setActivePotionEffects([]);
@@ -355,52 +347,63 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
     }
   }, [turn, gameState]);
 
-  // Runs synchronously on mount, still within the user-gesture context of the
-  // "Start Game" click, so the browser allows play() without autoplay policy blocking.
-  useLayoutEffect(() => {
-    if (!musicAudioRef.current) return;
-    musicAudioRef.current.loop = true;
-    const vol = musicVolume <= 0.5
-      ? musicVolume * 0.3
-      : 0.15 + (musicVolume - 0.5) * 0.7;
-    musicAudioRef.current.volume = vol;
+  useEffect(() => {
     if (musicVolume > 0) {
+      preMuteVolumeRef.current = musicVolume;
+    }
+  }, [musicVolume]);
+
+  // Initialize playlist behavior once and continuously advance tracks.
+  useLayoutEffect(() => {
+    const musicEl = musicAudioRef.current;
+    if (!musicEl) return;
+
+    const tryPlay = () => {
+      if (musicVolume <= 0 || !musicAudioRef.current) return;
       musicAudioRef.current.play().catch(() => {
-        // Autoplay blocked — try again on first user interaction
+        // Autoplay blocked: retry on first explicit interaction.
         const onUserInteraction = () => {
-          if (musicVolume > 0 && musicAudioRef.current && musicAudioRef.current.paused) {
+          if (musicVolume > 0 && musicAudioRef.current?.paused) {
             musicAudioRef.current.play().catch(() => {});
           }
         };
         window.addEventListener('pointerdown', onUserInteraction, { once: true });
         window.addEventListener('keydown', onUserInteraction, { once: true });
       });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    };
+
+    musicEl.loop = false;
+    musicEl.volume = toMusicGain(effectiveMusicVolume);
+    musicEl.currentTime = 0;
+
+    const onEnded = () => {
+      setMusicTrackIndex((prev) => (prev + 1) % MUSIC_TRACKS.length);
+    };
+
+    musicEl.addEventListener('ended', onEnded);
+    tryPlay();
+
+    return () => {
+      musicEl.removeEventListener('ended', onEnded);
+    };
   }, []);
 
-  // Only update volume (and pause/resume) when musicVolume changes after mount.
+  // Keep music state synchronized with track progression and effective volume.
   useEffect(() => {
-    if (!musicAudioRef.current) return;
-    const vol = musicVolume <= 0.5
-      ? musicVolume * 0.3
-      : 0.15 + (musicVolume - 0.5) * 0.7;
-    musicAudioRef.current.volume = vol;
-    if (musicVolume === 0) {
-      musicAudioRef.current.pause();
-    } else if (musicAudioRef.current.paused) {
-      musicAudioRef.current.play().catch(() => {});
-    }
-  }, [musicVolume]);
+    const musicEl = musicAudioRef.current;
+    if (!musicEl) return;
 
-  useEffect(() => {
-    if (!musicAudioRef.current) return;
-    if (gameState !== 'playing') {
-      musicAudioRef.current.pause();
-    } else if (musicVolume > 0) {
-      musicAudioRef.current.play().catch(() => {});
+    musicEl.volume = toMusicGain(effectiveMusicVolume);
+
+    if (effectiveMusicVolume <= 0) {
+      musicEl.pause();
+      return;
     }
-  }, [gameState, musicVolume]);
+
+    if (musicEl.paused) {
+      musicEl.play().catch(() => {});
+    }
+  }, [effectiveMusicVolume, musicTrackIndex]);
 
   const usePotion = (potion: PotionDef) => {
     if (gameState !== 'playing') return;
@@ -715,7 +718,8 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
   if (!cat) return null;
 
   const currentGoblin = GOBLINS[level - 1];
-  const caveImage = level <= 5 ? `cave${level}` : 'cave5';
+  const maxCaveIndex = 6;
+  const caveImage = `cave${Math.min(level, maxCaveIndex)}`;
 
   return (
     <div className="h-[100dvh] w-full bg-zinc-950 text-zinc-200 font-sans flex flex-col relative overflow-hidden">
@@ -743,40 +747,9 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
         <div className="flex items-center gap-3">
           <div ref={scoreTargetRef} className="text-amber-200 text-sm font-semibold">Score: {score}</div>
           <button
-            onPointerDown={(e) => {
-              e.preventDefault();
-              longPressTriggeredRef.current = false;
-              longPressTimerRef.current = window.setTimeout(() => {
-                longPressTriggeredRef.current = true;
-                setShowVolumeModal(true);
-              }, 500);
-            }}
-            onPointerUp={() => {
-              if (longPressTimerRef.current !== null) {
-                clearTimeout(longPressTimerRef.current);
-                longPressTimerRef.current = null;
-              }
-              if (!longPressTriggeredRef.current) {
-                // Short tap: toggle on/off
-                if (musicVolume > 0) {
-                  preMuteVolumeRef.current = musicVolume;
-                  setMusicVolume(0);
-                  setMusicEnabled(false);
-                } else {
-                  const restore = preMuteVolumeRef.current > 0 ? preMuteVolumeRef.current : 0.2;
-                  setMusicVolume(restore);
-                  setMusicEnabled(true);
-                }
-              }
-            }}
-            onPointerLeave={() => {
-              if (longPressTimerRef.current !== null) {
-                clearTimeout(longPressTimerRef.current);
-                longPressTimerRef.current = null;
-              }
-            }}
+            onClick={() => setShowVolumeModal(true)}
             className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border border-amber-500 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 transition-colors select-none touch-none"
-            title="Tap to toggle music · Hold to adjust volume"
+            title="Adjust music volume"
           >
             {musicVolume > 0 ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5 opacity-60" />}
             <span className={musicVolume === 0 ? 'opacity-40' : ''}>{Math.round(musicVolume * 100)}%</span>
@@ -899,12 +872,19 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
                 <AnimatePresence>
                   {damageResult !== null && (
                     <motion.div
-                      initial={{ opacity: 0, y: 0, scale: 0.5 }}
-                      animate={{ opacity: 1, y: -30, scale: 1.2 }}
-                      exit={{ opacity: 0 }}
+                      initial={{ opacity: 0, y: 10, scale: 0.82 }}
+                      animate={{
+                        opacity: [0, 1, 1, 0],
+                        y: [10, -10, -30, -46],
+                        scale: [0.82, 1.08, 1, 0.96],
+                      }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      transition={{ duration: 0.78, ease: 'easeOut' }}
                       className={cn(
-                        "absolute top-0 left-1/2 -translate-x-1/2 font-bold font-serif drop-shadow-md whitespace-nowrap",
-                        isCriticalHit ? "text-purple-400 text-3xl" : "text-red-500 text-xl"
+                        "absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-xl border font-black font-serif tracking-wide drop-shadow-2xl whitespace-nowrap pointer-events-none z-20",
+                        isCriticalHit
+                          ? "text-fuchsia-100 text-2xl sm:text-3xl bg-fuchsia-900/85 border-fuchsia-300/70"
+                          : "text-red-100 text-xl sm:text-2xl bg-red-900/85 border-red-300/70"
                       )}
                     >
                       -{damageResult} {isCriticalHit && "CRIT!"}
@@ -1051,6 +1031,21 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
               </div>
 
               <button
+                onClick={() => {
+                  if (musicVolume > 0) {
+                    preMuteVolumeRef.current = musicVolume;
+                    setMusicVolume(0);
+                    return;
+                  }
+                  const restore = preMuteVolumeRef.current > 0 ? preMuteVolumeRef.current : 0.2;
+                  setMusicVolume(restore);
+                }}
+                className="w-full px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg font-serif text-lg transition-colors"
+              >
+                {musicVolume > 0 ? 'Mute' : 'Unmute'}
+              </button>
+
+              <button
                 onClick={() => setShowVolumeModal(false)}
                 className="w-full px-6 py-3 bg-amber-600 hover:bg-amber-500 text-zinc-950 rounded-lg font-serif text-lg transition-colors"
               >
@@ -1123,7 +1118,7 @@ export default function Game({ onExit, musicVolume, setMusicVolume }: { onExit: 
       <audio ref={hitAudioRef} src="/sounds/cathit.wav" preload="auto" />
       <audio ref={yourTurnAudioRef} src="/sounds/yourturn.wav" preload="auto" />
       <audio ref={goblinTurnAudioRef} src="/sounds/goblinturn.wav" preload="auto" />
-      <audio ref={musicAudioRef} src={gameMusicSrc} preload="auto" />
+      <audio ref={musicAudioRef} src={MUSIC_TRACKS[musicTrackIndex]} preload="auto" />
       <audio ref={goblinLossAudioRef} src="/sounds/goblinloss.wav" preload="auto" />
       <audio ref={goblinWinAudioRef} src="/sounds/goblinwin.wav" preload="auto" />
       <audio ref={catDieAudioRef} src="/sounds/catdie.wav" preload="auto" />
