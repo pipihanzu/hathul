@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Shield, Sword, Skull, ArrowRight, Volume2, VolumeX } from 'lucide-react';
+import { Sword, Skull, ArrowRight, Volume2, VolumeX } from 'lucide-react';
 import Dice3D from './Dice3D';
 import { cn } from '../lib/utils';
 
@@ -1172,17 +1172,13 @@ export default function Game({
                         )}
                       >
                         <div className="flex items-center justify-center" title="Armor Class">
-                          <div className="inline-flex items-center gap-3 rounded-full border border-amber-800/30 bg-amber-100/40 px-4 py-2 sm:px-5 sm:py-3 shadow-[0_4px_14px_rgba(120,53,15,0.12)] backdrop-blur-sm">
-                            <div className="relative flex h-10 w-9 min-[380px]:h-12 min-[380px]:w-10 sm:h-14 sm:w-12 items-center justify-center shrink-0">
-                              <Shield className="absolute inset-0 h-full w-full fill-amber-300/20 text-amber-600" strokeWidth={1.8} />
-                              <span className="relative pt-0.5 text-[17px] min-[380px]:text-[21px] sm:text-2xl font-black text-amber-950">{cat.ac}</span>
-                            </div>
-                            <span className="text-[17px] min-[380px]:text-[21px] sm:text-2xl font-black uppercase tracking-[0.14em] text-amber-900">AC</span>
+                          <div className="inline-flex items-center gap-2 text-[17px] min-[380px]:text-[21px] sm:text-2xl font-black uppercase tracking-[0.14em] text-amber-900">
+                            <span>AC</span>
+                            <span className="text-amber-950">{cat.ac}</span>
                           </div>
                         </div>
                         <h2 className="text-base min-[380px]:text-lg sm:text-[1.6rem] font-serif font-black tracking-[0.01em] text-amber-950">{cat.name}</h2>
                         <div className="w-24 min-[380px]:w-28 sm:w-40 mx-auto mt-1.5 shrink-0">
-                          <div className="text-[10px] sm:text-xs font-semibold tracking-wide text-amber-900/85 mb-1">HP</div>
                           <div className="h-2 sm:h-2.5 bg-zinc-900/25 border border-amber-900/35 rounded-full overflow-hidden">
                             <motion.div
                               className="h-full bg-gradient-to-r from-rose-600 to-red-500"
