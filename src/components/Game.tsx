@@ -1177,7 +1177,7 @@ export default function Game({
                             <span className="text-amber-950">{cat.ac}</span>
                           </div>
                         </div>
-                        <h2 className="text-base min-[380px]:text-lg sm:text-[1.6rem] font-serif font-black tracking-[0.01em] text-amber-950">{cat.name}</h2>
+                        <h2 className="text-sm min-[380px]:text-base sm:text-[1.35rem] font-serif font-black tracking-[0.01em] text-amber-950">{cat.name}</h2>
                         <div className="w-24 min-[380px]:w-28 sm:w-40 mx-auto mt-1.5 shrink-0">
                           <div className="h-2 sm:h-2.5 bg-zinc-900/25 border border-amber-900/35 rounded-full overflow-hidden">
                             <motion.div
