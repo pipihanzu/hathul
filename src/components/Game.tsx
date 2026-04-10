@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sword, Skull, ArrowRight, Volume2, VolumeX } from 'lucide-react';
+import { Sword, Skull, ArrowRight, Volume2, VolumeX, Shield } from 'lucide-react';
 import Dice3D from './Dice3D';
 import { cn } from '../lib/utils';
 
@@ -49,12 +49,12 @@ type Goblin = {
 const GOBLINS: Goblin[] = [
   { level: 1, name: "Goblin Runt", weapon: "Axe", atkBonus: 4, dmgBonus: 2 },
   { level: 2, name: "Goblin Scrapper", weapon: "Magic Dagger", atkBonus: 3 },
-  { level: 3, name: "Goblin Brawler", weapon: "Hard Hand", dmgBonus: 2 },
+  { level: 3, name: "Goblin Brawler", weapon: "Hard Hand", dmgBonus: 1 },
   { level: 4, name: "Goblin Hunter", weapon: "Goblin's Dagger" },
   { level: 5, name: "Goblin Shaman", weapon: "Hammer of Good", atkBonus: -2 },
   { level: 6, name: "Goblin Chieftain", weapon: "Trickey Sword", atkBonus: -2, dmgBonus: -1, minDamage: 1 },
-  { level: 7, name: "Goblin Warlord", weapon: "Dagger of Milk", minDamage: 1, maxDamage: 3 },
-  { level: 8, name: "Goblin Emperor", weapon: "Semi Dragon Tooth", atkBonus: -2, dmgBonus: -1, minDamage: 1 },
+  { level: 7, name: "Goblin Warlord", weapon: "Dagger of Milk", minDamage: 1, maxDamage: 2 },
+  { level: 8, name: "Goblin Emperor", weapon: "Semi Dragon Tooth", atkBonus: -3, dmgBonus: -1, minDamage: 1 },
   { level: 9, name: "The Goblin God", weapon: "Master Cat Knife", atkBonus: -6, fixedDamage: 1 },
 ];
 
@@ -906,6 +906,7 @@ export default function Game({
   const isOpponentPulseActive = turnPulse?.target === 'opponent';
   const isPlayerPulseActive = turnPulse?.target === 'player';
   const isCatDead = cat.hp <= 0;
+  const shouldHideCatFrontContent = isCatDead || isCatFrontContentHidden;
   const levelClearedComment = LEVEL_CLEARED_COMMENTS[level] || "The goblin handled the cat. Fate handled your soul.";
 
   return (
@@ -1112,7 +1113,7 @@ export default function Game({
 
         {/* The Cat */}
         <div className="flex-1 min-h-0 flex flex-col items-center justify-center py-0.5 sm:py-4 relative overflow-visible sm:overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-amber-900/10 via-transparent to-transparent pointer-events-none" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-zinc-700/12 via-transparent to-transparent pointer-events-none" />
           
           <div
             className={cn(
@@ -1131,7 +1132,10 @@ export default function Game({
                     <div className="cat-card-front-frame relative flex h-full flex-col items-center justify-between gap-2 px-2 py-3 sm:gap-3 sm:px-3 sm:py-4">
                       <div className="relative w-[94%]">
                         <div
-                          className="w-full h-[6.3rem] min-[380px]:h-[7.1rem] sm:h-[11.4rem] transform-gpu transition-transform duration-700 flex items-center justify-center overflow-visible"
+                          className={cn(
+                            "w-full h-[6.3rem] min-[380px]:h-[7.1rem] sm:h-[11.4rem] transform-gpu transition-all duration-120 flex items-center justify-center overflow-visible",
+                            shouldHideCatFrontContent ? 'opacity-0 invisible' : 'opacity-100 visible'
+                          )}
                         >
                           <img
                             src={`/images/cats/cat_${level}.png`} 
@@ -1142,7 +1146,7 @@ export default function Game({
                         </div>
                         {/* Damage Indicator */}
                         <AnimatePresence>
-                          {!isCatFrontContentHidden && damageResult !== null && (
+                          {!shouldHideCatFrontContent && damageResult !== null && (
                             <motion.div
                               initial={{ opacity: 0, y: 10, scale: 0.82 }}
                               animate={{
@@ -1168,18 +1172,18 @@ export default function Game({
                       <div
                         className={cn(
                           "text-center space-y-1 sm:space-y-2 w-full shrink-0 transition-opacity duration-150",
-                          isCatFrontContentHidden ? 'opacity-0' : 'opacity-100'
+                          shouldHideCatFrontContent ? 'opacity-0' : 'opacity-100'
                         )}
                       >
                         <div className="flex items-center justify-center" title="Armor Class">
-                          <div className="inline-flex items-center gap-2 text-[17px] min-[380px]:text-[21px] sm:text-2xl font-black uppercase tracking-[0.14em] text-amber-900">
-                            <span>AC</span>
-                            <span className="text-amber-950">{cat.ac}</span>
+                          <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full border border-zinc-300/55 bg-zinc-900/50 text-zinc-50">
+                            <Shield className="w-4 h-4 min-[380px]:w-5 min-[380px]:h-5" />
+                            <span className="text-[16px] min-[380px]:text-[20px] sm:text-[22px] font-black leading-none">{cat.ac}</span>
                           </div>
                         </div>
-                        <h2 className="text-sm min-[380px]:text-base sm:text-[1.35rem] font-serif font-black tracking-[0.01em] text-amber-950">{cat.name}</h2>
+                        <h2 className="text-sm min-[380px]:text-base sm:text-[1.35rem] font-serif font-black tracking-[0.01em] text-zinc-100">{cat.name}</h2>
                         <div className="w-24 min-[380px]:w-28 sm:w-40 mx-auto mt-1.5 shrink-0">
-                          <div className="h-2 sm:h-2.5 bg-zinc-900/25 border border-amber-900/35 rounded-full overflow-hidden">
+                          <div className="h-2 sm:h-2.5 bg-zinc-900/35 border border-zinc-400/35 rounded-full overflow-hidden">
                             <motion.div
                               className="h-full bg-gradient-to-r from-rose-600 to-red-500"
                               initial={{ width: '100%' }}
