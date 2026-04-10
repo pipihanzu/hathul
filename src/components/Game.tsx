@@ -39,18 +39,21 @@ type Goblin = {
   weapon?: string;
   atkBonus?: number;
   dmgBonus?: number;
+  minDamage?: number;
+  maxDamage?: number;
+  fixedDamage?: number;
 };
 
 const GOBLINS: Goblin[] = [
-  { level: 1, name: "Goblin Runt", weapon: "Axe", atkBonus: 0, dmgBonus: 2 },
-  { level: 2, name: "Goblin Scrapper", weapon: "Magic Dagger", atkBonus: 1, dmgBonus: 0 },
-  { level: 3, name: "Goblin Brawler" },
-  { level: 4, name: "Goblin Hunter" },
-  { level: 5, name: "Goblin Shaman" },
-  { level: 6, name: "Goblin Chieftain" },
-  { level: 7, name: "Goblin Warlord" },
-  { level: 8, name: "Goblin Emperor" },
-  { level: 9, name: "The Goblin God" },
+  { level: 1, name: "Goblin Runt", weapon: "Axe", atkBonus: 4, dmgBonus: 2 },
+  { level: 2, name: "Goblin Scrapper", weapon: "Magic Dagger", atkBonus: 3 },
+  { level: 3, name: "Goblin Brawler", weapon: "Hard Hand", dmgBonus: 2 },
+  { level: 4, name: "Goblin Hunter", weapon: "Goblin's Dagger" },
+  { level: 5, name: "Goblin Shaman", weapon: "Hammer of Good", atkBonus: -2 },
+  { level: 6, name: "Goblin Chieftain", weapon: "Trickey Sword", atkBonus: -2, dmgBonus: -1, minDamage: 1 },
+  { level: 7, name: "Goblin Warlord", weapon: "Dagger of Milk", minDamage: 1, maxDamage: 3 },
+  { level: 8, name: "Goblin Emperor", weapon: "Semi Dragon Tooth", atkBonus: -2, dmgBonus: -1, minDamage: 1 },
+  { level: 9, name: "The Goblin God", weapon: "Master Cat Knife", atkBonus: -6, fixedDamage: 1 },
 ];
 
 const CAT_NAMES = ["Sir Pounce", "Mittens", "Shadow", "Luna", "Whiskers", "Balthazar", "Meowth", "Professor Fluff"];
@@ -477,7 +480,6 @@ export default function Game({
     const attackerName = turn === 'player' ? 'Player' : currentGoblin.name;
     
     let atkBonus = turn === 'opponent' ? (currentGoblin.atkBonus || 0) : 0;
-    const dmgBonus = turn === 'opponent' ? (currentGoblin.dmgBonus || 0) : 0;
     
     let effectiveAc = cat.ac;
 
@@ -581,15 +583,45 @@ export default function Game({
     } else if (rollPhase === 'd6') {
       const baseDamage = rollResult;
       const diceDamage = isCriticalHit ? baseDamage * 2 : baseDamage;
-      const totalDamage = diceDamage + dmgBonus;
+      let totalDamage = diceDamage;
+      let damageDetails = `${diceDamage}`;
+
+      if (turn === 'opponent') {
+        const dmgBonus = currentGoblin.dmgBonus || 0;
+        if (dmgBonus !== 0) {
+          const sign = dmgBonus > 0 ? '+' : '-';
+          damageDetails += ` ${sign} ${Math.abs(dmgBonus)}`;
+          totalDamage += dmgBonus;
+        }
+
+        if (typeof currentGoblin.fixedDamage === 'number') {
+          totalDamage = currentGoblin.fixedDamage;
+          damageDetails = `fixed ${totalDamage}`;
+        } else {
+          if (typeof currentGoblin.minDamage === 'number' && totalDamage < currentGoblin.minDamage) {
+            totalDamage = currentGoblin.minDamage;
+            damageDetails += ` -> min ${currentGoblin.minDamage}`;
+          }
+          if (typeof currentGoblin.maxDamage === 'number' && totalDamage > currentGoblin.maxDamage) {
+            totalDamage = currentGoblin.maxDamage;
+            damageDetails += ` -> max ${currentGoblin.maxDamage}`;
+          }
+        }
+
+        if (totalDamage < 1) {
+          totalDamage = 1;
+          damageDetails += ' -> min 1';
+        }
+      }
+
       setDamageResult(totalDamage);
       
       const newHp = Math.max(0, cat.hp - totalDamage);
       setCat({ ...cat, hp: newHp });
       triggerHitHaptic();
       
-      if (dmgBonus > 0) {
-        addLog(`Dealt ${totalDamage} damage (${diceDamage} + ${dmgBonus})${isCriticalHit ? ' (Doubled!)' : ''}.`, 'hit');
+      if (turn === 'opponent' && damageDetails !== `${diceDamage}`) {
+        addLog(`Dealt ${totalDamage} damage (${damageDetails})${isCriticalHit ? ' (Doubled!)' : ''}.`, 'hit');
       } else {
         addLog(`Dealt ${totalDamage} damage${isCriticalHit ? ' (Doubled!)' : ''}.`, 'hit');
       }
@@ -956,11 +988,13 @@ export default function Game({
               <h3 className="font-serif text-lg sm:text-xl text-zinc-100">{currentGoblin.name}</h3>
               {turn === 'opponent' && <span className="text-xs sm:text-sm font-bold text-amber-300 animate-pulse">ACTIVE TURN</span>}
             </div>
-            {(currentGoblin.atkBonus || currentGoblin.dmgBonus || currentGoblin.weapon) && (
+            {(currentGoblin.atkBonus !== undefined || currentGoblin.dmgBonus !== undefined || currentGoblin.weapon || currentGoblin.minDamage !== undefined || currentGoblin.maxDamage !== undefined || currentGoblin.fixedDamage !== undefined) && (
               <div className="text-xs text-zinc-400 font-mono">
                 {currentGoblin.weapon && <span className="mr-2">{currentGoblin.weapon}</span>}
-                {currentGoblin.atkBonus ? `Atk: +${currentGoblin.atkBonus} ` : ''}
-                {currentGoblin.dmgBonus ? `Dmg: +${currentGoblin.dmgBonus}` : ''}
+                {currentGoblin.atkBonus !== undefined ? `Atk: ${currentGoblin.atkBonus >= 0 ? '+' : ''}${currentGoblin.atkBonus} ` : ''}
+                {currentGoblin.dmgBonus !== undefined ? `Dmg: ${currentGoblin.dmgBonus >= 0 ? '+' : ''}${currentGoblin.dmgBonus} ` : ''}
+                {currentGoblin.fixedDamage !== undefined ? `Dmg Fixed: ${currentGoblin.fixedDamage} ` : ''}
+                {currentGoblin.minDamage !== undefined && currentGoblin.maxDamage !== undefined ? `Dmg Range: ${currentGoblin.minDamage}-${currentGoblin.maxDamage}` : ''}
               </div>
             )}
           </div>
