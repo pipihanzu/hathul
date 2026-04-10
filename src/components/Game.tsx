@@ -442,7 +442,7 @@ export default function Game({
         const indicatorId = critRollIndicatorIdRef.current++;
         setCritRollIndicator({
           id: indicatorId,
-          text: rollResult === 20 ? 'NAT 20 - CRITICAL HIT' : 'NAT 1 - CRITICAL MISS',
+          text: rollResult === 20 ? '20 CRITICAL HIT' : '1 CRITICAL MISS',
           tone: rollResult === 20 ? 'hit' : 'miss',
         });
 
