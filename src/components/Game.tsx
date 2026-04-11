@@ -876,10 +876,10 @@ export default function Game({
             <div className="flex flex-col sm:flex-row gap-2">
               <input
                 value={leaderboardName}
-                onChange={(e) => setLeaderboardName(e.target.value.replace(/[^A-Za-z0-9 ]/g, '').slice(0, 24))}
-                placeholder="Name (letters/numbers only)"
+                onChange={(e) => setLeaderboardName(e.target.value.replace(/[^A-Za-z0-9 ]/g, '').slice(0, 9))}
+                placeholder="Name (max 9 chars)"
                 className="flex-1 px-3 py-2 rounded bg-zinc-950 border border-zinc-700 text-zinc-200 outline-none focus:border-amber-500"
-                maxLength={24}
+                maxLength={9}
               />
               <button
                 onClick={submitLeaderboardScore}

@@ -382,10 +382,10 @@ export default function App() {
                   {leaderboardEntries.map((entry, index) => (
                     <div
                       key={entry.id}
-                      className="grid grid-cols-[56px_1fr_90px_70px] items-center gap-3 rounded-lg px-3 py-2 bg-zinc-950/70 border border-zinc-800"
+                      className="grid grid-cols-[56px_minmax(9ch,1fr)_72px_48px] items-center gap-3 rounded-lg px-3 py-2 bg-zinc-950/70 border border-zinc-800 text-sm sm:grid-cols-[56px_minmax(9ch,1fr)_90px_70px] sm:text-base"
                     >
                       <div className="text-amber-400 font-semibold">#{index + 1}</div>
-                      <div className="text-zinc-200 truncate">{entry.name}</div>
+                      <div className="min-w-[9ch] pr-2 text-zinc-200 whitespace-nowrap">{entry.name}</div>
                       <div className="text-amber-200 text-right font-semibold">{entry.score}</div>
                       <div className="text-zinc-400 text-right">L{entry.level}</div>
                     </div>
