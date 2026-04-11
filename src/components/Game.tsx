@@ -240,6 +240,13 @@ export default function Game({
     addScore(SCORE_BASE_ROLL);
   };
 
+  const getOpponentLowRollChance = (lvl: number) => {
+    if (lvl < 4) return 0;
+    if (lvl >= 9) return 0.3;
+    // Level 4 => 10%, Level 9 => 30% (linear +4% per level)
+    return 0.1 + (lvl - 4) * 0.04;
+  };
+
   useEffect(() => {
     if (logContainerRef.current) {
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
@@ -394,6 +401,18 @@ export default function Game({
     
     if (rollPhase === 'idle') {
       if (turn === 'player') awardPlayerRollAttempt();
+
+      const shouldForceOpponentLowRoll =
+        turn === 'opponent' && Math.random() < getOpponentLowRollChance(level);
+
+      if (shouldForceOpponentLowRoll) {
+        if (modifierAudioRef.current) {
+          modifierAudioRef.current.currentTime = 0;
+          modifierAudioRef.current.play().catch(e => console.log('Audio play failed:', e));
+        }
+        addLog(`${GOBLINS[level - 1].name} casts dark magic. Next roll is cursed.`, 'info');
+      }
+
       setRollPhase('d20');
       setRollResult(null);
       setDamageResult(null);
@@ -409,7 +428,9 @@ export default function Game({
 
       // Simulate roll duration
       setTimeout(() => {
-        const d20 = Math.floor(Math.random() * 20) + 1;
+        const d20 = shouldForceOpponentLowRoll
+          ? Math.floor(Math.random() * 3) + 1
+          : Math.floor(Math.random() * 20) + 1;
         setRollResult(d20);
       }, 1750);
     } else if (rollPhase === 'waiting-d6' && turn === 'player') {
@@ -1017,7 +1038,7 @@ export default function Game({
             transition={{ duration: 0.24, ease: 'easeInOut' }}
             className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center"
           >
-            <div className="w-[380px] max-w-[90vw] rounded-2xl border border-amber-300/70 bg-zinc-900/96 shadow-2xl p-6 flex flex-col items-center justify-center gap-4">
+            <div className="w-[380px] max-w-[90vw] rounded-2xl border border-amber-300/70 bg-zinc-900/96 shadow-2xl p-6 flex flex-col items-center justify-center gap-4" style={{ transform: 'scale(0.8)' }}>
               <img
                 src={potionPreview.icon}
                 alt={potionPreview.name}
