@@ -47,10 +47,10 @@ type Goblin = {
 };
 
 const GOBLINS: Goblin[] = [
-  { level: 1, name: "Goblin Runt", weapon: "Axe", atkBonus: 4, dmgBonus: 2 },
-  { level: 2, name: "Goblin Scrapper", weapon: "Magic Dagger", atkBonus: 3 },
+  { level: 1, name: "Goblin Runt", weapon: "Axe", atkBonus: 3, dmgBonus: 2 },
+  { level: 2, name: "Goblin Scrapper", weapon: "Magic Dagger", atkBonus: 2 },
   { level: 3, name: "Goblin Brawler", weapon: "Hard Hand", dmgBonus: 1 },
-  { level: 4, name: "Goblin Hunter", weapon: "Goblin's Dagger" },
+  { level: 4, name: "Goblin Hunter", weapon: "Goblin's Dagger", atkBonus: -1 },
   { level: 5, name: "Goblin Shaman", weapon: "Hammer of Good", atkBonus: -2 },
   { level: 6, name: "Goblin Chieftain", weapon: "Trickey Sword", atkBonus: -2, dmgBonus: -1, minDamage: 1 },
   { level: 7, name: "Goblin Warlord", weapon: "Dagger of Milk", minDamage: 1, maxDamage: 2 },
@@ -241,10 +241,12 @@ export default function Game({
   };
 
   const getOpponentLowRollChance = (lvl: number) => {
-    if (lvl < 4) return 0;
-    if (lvl >= 9) return 0.3;
-    // Level 4 => 10%, Level 9 => 30% (linear +4% per level)
-    return 0.1 + (lvl - 4) * 0.04;
+    if (lvl < 2) return 0;
+    if (lvl < 4) return 0.15;
+    if (lvl >= 9) return 0.45;
+    // Level 4 => 25%, Level 9 => 45% (linear +4% per level),
+    // with a +15% floor already applied from level 2 onward.
+    return 0.25 + (lvl - 4) * 0.04;
   };
 
   useEffect(() => {
@@ -922,8 +924,9 @@ export default function Game({
   if (!cat) return null;
 
   const currentGoblin = GOBLINS[level - 1];
-  const maxCaveIndex = 6;
-  const caveImage = `cave${Math.min(level, maxCaveIndex)}`;
+  const maxCaveIndex = 9;
+  const caveLevel = Math.max(1, Math.min(level, maxCaveIndex));
+  const caveImage = `cave${caveLevel}`;
   const isOpponentPulseActive = turnPulse?.target === 'opponent';
   const isPlayerPulseActive = turnPulse?.target === 'player';
   const isCatDead = cat.hp <= 0;
@@ -947,7 +950,7 @@ export default function Game({
       <div className="relative h-full w-full max-w-2xl mx-auto flex flex-col overflow-hidden">
         <div
           className="absolute inset-0 bg-center bg-cover pointer-events-none"
-          style={{ backgroundImage: `url('/images/elements/caves/${caveImage}.png')` }}
+          style={{ backgroundImage: `url('/images/elements/caves/jpg/${caveImage}.jpg')` }}
         />
       {/* 3D Dice Overlay */}
       {rollPhase !== 'idle' && (
@@ -1488,7 +1491,7 @@ export default function Game({
           >
             <div
               className="absolute inset-0 bg-center bg-cover"
-              style={{ backgroundImage: `url('/images/elements/caves/${caveImage}.png')` }}
+              style={{ backgroundImage: `url('/images/elements/caves/jpg/${caveImage}.jpg')` }}
             />
             <div className="absolute inset-0 bg-zinc-950/60 backdrop-blur-[5px]" />
 
@@ -1554,8 +1557,8 @@ export default function Game({
 
               {gameState === 'gameWon' && (
                 <>
-                  <h2 className="text-5xl font-serif text-amber-500">Victory!</h2>
-                  <p className="text-zinc-400">You survived all 9 levels. The cats are safe.</p>
+                  <h2 className="text-5xl font-serif text-amber-500">Victory, You Menace.</h2>
+                  <p className="text-zinc-400">Nine levels down, zero regrets, and an alarming amount of goblin nonsense later: the cats are safe.</p>
                   {renderLeaderboardPanel()}
                   <button onClick={() => startLevel(1)} className="px-8 py-4 bg-amber-600 hover:bg-amber-500 text-zinc-950 rounded-sm font-serif text-xl w-full transition-colors">
                     Play Again
