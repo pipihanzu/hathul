@@ -12,6 +12,17 @@ import Game from './components/Game';
 const MUSIC_TRACKS = ['/sounds/music1.mp3', '/sounds/music2.mp3', '/sounds/music3.mp3', '/sounds/music4.mp3'];
 type MusicPlaybackState = 'playing' | 'paused' | 'stopped';
 
+const getNextRandomTrackIndex = (currentIndex: number) => {
+  if (MUSIC_TRACKS.length <= 1) return 0;
+
+  let nextIndex = currentIndex;
+  while (nextIndex === currentIndex) {
+    nextIndex = Math.floor(Math.random() * MUSIC_TRACKS.length);
+  }
+
+  return nextIndex;
+};
+
 type LeaderboardEntry = {
   id: string;
   name: string;
@@ -190,7 +201,7 @@ export default function App() {
 
     const onEnded = () => {
       if (musicPlaybackState !== 'playing') return;
-      setMusicTrackIndex((prev) => (prev + 1) % MUSIC_TRACKS.length);
+      setMusicTrackIndex((prev) => getNextRandomTrackIndex(prev));
     };
 
     musicEl.addEventListener('ended', onEnded);
