@@ -1200,10 +1200,10 @@ export default function Game({
                           shouldHideCatFrontContent ? 'opacity-0' : 'opacity-100'
                         )}
                       >
-                        <div className="flex items-center justify-center" title="Armor Class">
+                        <div className="flex items-center justify-center">
                           <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full border border-zinc-300/55 bg-zinc-900/50 text-zinc-50">
-                            <Shield className="w-4 h-4 min-[380px]:w-5 min-[380px]:h-5" />
-                            <span className="text-[16px] min-[380px]:text-[20px] sm:text-[22px] font-black leading-none">{cat.ac}</span>
+                            <Shield aria-hidden="true" className="w-4 h-4 min-[380px]:w-5 min-[380px]:h-5" />
+                            <span className="text-[16px] min-[380px]:text-[20px] sm:text-[22px] font-black leading-none">AC {cat.ac}</span>
                           </div>
                         </div>
                         <h2 className="text-sm min-[380px]:text-base sm:text-[1.35rem] font-serif font-black tracking-[0.01em] text-zinc-100">{cat.name}</h2>
