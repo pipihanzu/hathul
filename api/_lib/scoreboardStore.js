@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { put, head, del } from '@vercel/blob';
+import { get, put } from '@vercel/blob';
 
 const MAX_ENTRIES = 30;
 const BLOB_FILENAME = 'scoreboard.json';
@@ -53,9 +53,17 @@ export function computeQualification(entries, score, level) {
 
 async function readFromBlob() {
   try {
-    const existing = await head(BLOB_FILENAME, { token: process.env.BLOB_READ_WRITE_TOKEN });
-    const response = await fetch(existing.url);
-    const parsed = await response.json();
+    const existing = await get(BLOB_FILENAME, {
+      access: 'public',
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    });
+
+    if (!existing || existing.statusCode !== 200 || !existing.stream) {
+      return [];
+    }
+
+    const raw = await new Response(existing.stream).text();
+    const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
@@ -68,6 +76,8 @@ async function writeToBlob(entries) {
     contentType: 'application/json',
     token: process.env.BLOB_READ_WRITE_TOKEN,
     addRandomSuffix: false,
+    allowOverwrite: true,
+    cacheControlMaxAge: 60,
   });
 }
 

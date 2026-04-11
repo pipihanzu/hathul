@@ -794,7 +794,8 @@ export default function Game({
     try {
       const res = await fetch(`/api/scoreboard/qualify?score=${score}&level=${level}`);
       if (!res.ok) {
-        throw new Error('Leaderboard service unavailable. Start both services with: npm run dev');
+        const errorPayload = await res.json().catch(() => ({}));
+        throw new Error(errorPayload.error || 'Leaderboard service unavailable.');
       }
       const data = await res.json();
 
@@ -807,7 +808,7 @@ export default function Game({
       }
     } catch (error) {
       setLeaderboardState('error');
-      setLeaderboardMessage(error instanceof Error ? error.message : 'Could not check leaderboard. Start both services with: npm run dev');
+      setLeaderboardMessage(error instanceof Error ? error.message : 'Could not check leaderboard.');
     }
   };
 
@@ -839,7 +840,7 @@ export default function Game({
 
       if (!res.ok) {
         const errorPayload = await res.json().catch(() => ({}));
-        throw new Error(errorPayload.error || 'Failed to submit score. Ensure API is running (npm run dev).');
+        throw new Error(errorPayload.error || 'Failed to submit score.');
       }
 
       const data = await res.json();
@@ -848,7 +849,7 @@ export default function Game({
       setLeaderboardMessage('Score saved to leaderboard.');
     } catch (error) {
       setLeaderboardState('error');
-      setLeaderboardMessage(error instanceof Error ? error.message : 'Failed to save score. Ensure API is running (npm run dev).');
+      setLeaderboardMessage(error instanceof Error ? error.message : 'Failed to save score.');
     }
   };
 
