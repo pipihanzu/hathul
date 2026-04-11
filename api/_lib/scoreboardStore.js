@@ -1,11 +1,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { kv } from '@vercel/kv';
+import { put, head, del } from '@vercel/blob';
 
 const MAX_ENTRIES = 30;
-const SCOREBOARD_KEY = 'hathul:scoreboard';
+const BLOB_FILENAME = 'scoreboard.json';
 
-const hasKvConfig = Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+const hasBlobConfig = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 const isVercelRuntime = Boolean(process.env.VERCEL);
 const ROOT_DIR = process.cwd();
 const DATA_PATH = path.join(ROOT_DIR, 'data', 'scoreboard.json');
@@ -51,6 +51,26 @@ export function computeQualification(entries, score, level) {
   };
 }
 
+async function readFromBlob() {
+  try {
+    const existing = await head(BLOB_FILENAME, { token: process.env.BLOB_READ_WRITE_TOKEN });
+    const response = await fetch(existing.url);
+    const parsed = await response.json();
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeToBlob(entries) {
+  await put(BLOB_FILENAME, JSON.stringify(entries, null, 2), {
+    access: 'public',
+    contentType: 'application/json',
+    token: process.env.BLOB_READ_WRITE_TOKEN,
+    addRandomSuffix: false,
+  });
+}
+
 async function readFromFile() {
   try {
     const raw = await fs.readFile(DATA_PATH, 'utf8');
@@ -78,9 +98,8 @@ async function writeToFile(entries) {
 }
 
 export async function loadEntries() {
-  if (hasKvConfig) {
-    const stored = await kv.get(SCOREBOARD_KEY);
-    return Array.isArray(stored) ? stored : [];
+  if (hasBlobConfig) {
+    return readFromBlob();
   }
 
   if (isVercelRuntime) {
@@ -93,8 +112,8 @@ export async function loadEntries() {
 export async function saveEntries(entries) {
   const sorted = sortEntries(entries).slice(0, MAX_ENTRIES);
 
-  if (hasKvConfig) {
-    await kv.set(SCOREBOARD_KEY, sorted);
+  if (hasBlobConfig) {
+    await writeToBlob(sorted);
     return sorted;
   }
 
